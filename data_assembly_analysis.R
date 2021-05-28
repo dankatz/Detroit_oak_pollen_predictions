@@ -17,7 +17,7 @@ library(raster)
 # Effect of intra-urban temperature variation on tree flowering phenology, airborne pollen, and 
 # measurement error in epidemiological studies of allergenic pollen
 p17 <- read_csv("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pollen_2017.csv") %>% 
-    dplyr::select(date, jday, long, lat, oak_mean, oak_sd) %>% 
+    dplyr::select(name, long, lat, date, jday, oak_mean, oak_sd) %>% 
     mutate(dates = ymd(date),
            taxa = "p_Quercus",
            taxa2 = "Quercus",
@@ -55,29 +55,48 @@ p18_utm <- st_transform(p18_utm, 32617) #set as UTM 17
 # Improved Classification of Urban Trees Using a Widespread Multi-Temporal Aerial Image Dataset
 # original shapefile: 
 
-# tree_pred <- st_read("E:/tree_classification/predictions/pred190715.shp")
-# p_Quru <- filter(tree_pred, prdctd_ == "Quercus") %>%  dplyr::select(area)
+tree_pred <- st_read("C:/Users/dsk856/Box/MIpostdoc/trees/tree_identificaiton/predictions/pred190715.shp")
+p_Quru <- filter(tree_pred, prdctd_ == "Quercus") %>%  dplyr::select(area)
 
 # Pollen production is described in Katz et al. 2020:
 # Pollen production for 13 urban North American tree species: allometric equations for tree trunk diameter and crown area
 
-# p_Quru$predpollen <- p_Quru$area * 0.97 + 17.02 #using equation for red oak
-# write_sf(p_Quru, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pred_qusp_pol_prod200310.shp")
-# 
-# d_rast <- raster(ncol = 145, nrow = 212) #approximately 100 x 100 m pixel size
-# extent(d_rast) <- extent(tree_pred)
-# 
-# trees_as_points <- p_sp %>% st_cast("POINT", do_split = FALSE)
-# p_rast <- rasterize(trees_as_points, d_rast, field = "predpollen", fun = sum, na.rm = TRUE)
-# pixel_area <- (res(p_rast)[1] * res(p_rast)[2]) #get pixel area in m2
-# p_rast <- (p_rast/ pixel_area) * 1000000 #convert to pol/m2 (was originally in millions)
-# p_rast[p_rast < 0] <- 0 #make sure that none of the trees have values below 0
-# crs(p_rast) <- CRS('+init=EPSG:32617')
-# plot(p_rast)
-# projection(p_rast)
+p_Quru$predpollen <- p_Quru$area * 0.97 + 17.02 #using equation for red oak
+write_sf(p_Quru, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pred_qusp_pol_prod200310.shp")
+p_Quru <- read_sf("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pred_qusp_pol_prod200310.shp")
+
+#create a blank raster with approximately 100 x 100 m pixel size
+d_rast <- raster(ncol = 145, nrow = 212) 
+extent(d_rast) <- extent(tree_pred)
+
+d_rast_10m <- raster(ncol = 1453, nrow = 2116) #approximately 10 x 10 m pixel size
+extent(d_rast_10m) <- extent(tree_pred)
+d_rast <- d_rast_10m
+
+trees_as_points <- p_Quru %>% st_cast("POINT", do_split = FALSE)
+p_rast <- rasterize(trees_as_points, d_rast, field = "predpollen", fun = sum, na.rm = TRUE)
+pixel_area <- (res(p_rast)[1] * res(p_rast)[2]) #get pixel area in m2
+p_rast <- (p_rast/ pixel_area) * 1000000 #convert to pol/m2 (was originally in millions)
+p_rast[p_rast < 0] <- 0 #make sure that none of the trees have values below 0
+#p_rast[is.na(p_rast)] <- 0 #set cells with no oak tree (but within extent of tree map) to zero
+crs(p_rast) <- CRS('+init=EPSG:32617')
+plot(p_rast)
+projection(p_rast)
+
+# Setting zeroes vs NA values
+#load in a shapefile that has Detroit's boundary clipped to the middle tile of WV2 imagery (i.e., the area of tree ID project)
+d_wv2_boundary <- read_sf("C:/Users/dsk856/Box/MIpostdoc/Detroit spatial data/Detroit boundary/Detroit_wv2_middle_boundary.shp")
+d_wv2_boundary_utm <- st_transform(d_wv2_boundary, 32617)
+
+#set NA values in that area to 0
+# p_rast
+# plot(st_geometry(p17_total_season), add = TRUE)
+# plot(st_geometry(d_wv2_boundary_utm), add = TRUE)
+p_rast <- raster::mask(x = p_rast, mask = d_wv2_boundary_utm)
+
 
 #writeRaster(p_rast, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_200302.tif", format="GTiff")
-p_rast <- raster("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_200302.tif")
+#p_rast <- raster("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_200302.tif")
 #plot(p_rast)
 
 ### data assembly: phenology model data #################################################################
@@ -267,10 +286,110 @@ list.files(path = ".", pattern = "*.png", full.names = T) %>%
 
 ### Fig 2: comparing pollen release over space with airborne pollen concentrations ######################
 #comparing 2017 data
+p17_total_season <- p17_utm %>% 
+  group_by(name) %>% 
+  summarize(oak_season_mean = mean(oak_mean))
+
+plot(p_rast)
+plot(st_geometry(p17_total_season), add = TRUE)
+
+distance_loop <- c(seq(from = 100, to = 1000, by = 100), seq(from = 1000, to = 10000, by = 1000))
+
+for(i in 1:length(distance_loop)){
+pollen_within_distance_x <- raster::extract(p_rast, p17_total_season, fun = mean, buffer = distance_loop[i], na.rm = TRUE)
+
+p17_total_season <- p17_total_season %>% 
+  mutate(pollen_within_dist_x = pollen_within_distance_x) 
+
+print(p17_total_season %>% 
+  ggplot(aes(x = pollen_within_dist_x, y = oak_season_mean)) + geom_point() + theme_bw() + geom_smooth(method = "lm", se = FALSE) 
+)
+
+print(c(distance_loop[i],
+  summary(lm(p17_total_season$oak_season_mean ~p17_total_season$pollen_within_dist_x))$r.squared))
+}
+
+
+
 
 #comparing 2018 data
+plot(p_rast)
+p18_total_season <- p18_utm %>% 
+  group_by(site) %>% 
+  summarize(oak_season_mean = mean(pollen))
+
+plot(st_geometry(p18_total_season), add = TRUE, pch = 4)
 
 
+for(i in 1:length(distance_loop)){
+  pollen_within_distance_x <- raster::extract(p_rast, p18_total_season, fun = mean, buffer = distance_loop[i], na.rm = TRUE)
+  
+  p18_total_season <- p18_total_season %>% 
+    mutate(pollen_within_dist_x = pollen_within_distance_x) 
+  
+  print(p18_total_season %>% 
+          ggplot(aes(x = log10(pollen_within_dist_x + 1), y = oak_season_mean)) + geom_point() + theme_bw() + geom_smooth(method = "lm", se = FALSE) + 
+          ggtitle(distance_loop[i]) #+ xlim(0, 20000)
+  )
+  
+  print(c(distance_loop[i],
+          summary(lm(p18_total_season$oak_season_mean ~ log10(p18_total_season$pollen_within_dist_x + 1)))$r.squared,
+          summary(glm(p18_total_season$oak_season_mean ~ log10(p18_total_season$pollen_within_dist_x + 1)))$aic))
+}
+
+## testing out the siland package -----------------------------
+library(siland)
+data(dataSiland)
+data(landSiland)
+landSiland$L3 <- 1
+
+resF1=Fsiland( obs ~ L3, land=landSiland, data=dataSiland)
+plotFsiland.sif(resF1)
+
+p_Quru2 <- p_Quru %>%  mutate(placeholder = 1) #predpollen
+#p_Quru2 <- st_set_crs(p_Quru2, crs(p18_total_season))
+#p_Quru2 <- sample_frac(p_Quru2, 0.1)
+
+p18_total_season2 <- p18_total_season %>%  mutate(X = sf::st_coordinates(.)[,1],
+                             Y = sf::st_coordinates(.)[,2])
+#filter out the observations that are from outside of the oak ID area
+p18_total_season2 <- st_join(p18_total_season2, d_wv2_boundary_utm) %>%  #boundary was loaded in above
+  filter(!is.na(is_D))
+p18_total_season2$geometry <- NULL
+
+
+### buffer approach
+resF1= Bsiland(oak_season_mean ~ placeholder, land= p_Quru2, data= p18_total_season2) #takes ~15 min
+resF1 #best buffer size estimated at: 587.704 m, but stays pretty good from ~ 500 m - 1500 m  
+summary(resF1)
+
+#a visual comparison of what buffer size has lowest negative log likelihood
+likresB1 = Bsiland.lik(resF1,land= p_Quru2, data=p18_total_season2, varnames=c("placeholder")) #takes a few minutes
+likresB1
+
+#map of landscape variable
+plotBsiland.land(x=resF1,land=p_Quru2,data=as.data.frame(p18_total_season2))
+
+
+### continuous approach
+resF2 = Fsiland(oak_season_mean ~ placeholder, land= p_Quru2, data= p18_total_season2, sif = "gaussian", wd = 10)
+#Sys.time()
+resF2
+summary(resF2)
+str(resF2)
+resF2$result$fitted.values
+plotFsiland.sif(resF2)
+Fsiland.quantile(resF2, p = c(0.5, 0.95, 0.99))  #95% of effect is from within 1307 m
+plotFsiland.land(x=resF2,land=p_Quru2, data=p18_total_season2) #takes a minute, but it's a fairly pretty map of risk
+
+
+p18_total_season2 %>% 
+  mutate(fitted.valuess = resF2$result$fitted.values,
+         resid = resF2$result$residuals) %>% 
+  ggplot(aes(x = oak_season_mean, y = fitted.valuess, color = resid)) + geom_point() + geom_abline(slope = 1, intercept = 0, lty = 2) + theme_bw() +
+  xlim(0,600) + ylim(0, 600)
+
+fitted.Fsiland(resF2)
 
 ### Fig 3: comparing pollen release over space and time with airborne pollen concentrations #############
 p2017_sf_utm17$p_prod_day_1km <- NA
