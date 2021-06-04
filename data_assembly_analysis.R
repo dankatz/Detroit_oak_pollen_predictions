@@ -24,6 +24,8 @@ p17 <- read_csv("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pollen_2017
            taxa3 = "italic(Quercus)")
 p17_utm <- st_as_sf(p17, coords = c("long", "lat"), crs = 4326)
 p17_utm <- st_transform(p17_utm, 32617)
+p17_utm %>% dplyr::select(name) %>% plot(cex = 5, pch = 17)
+write_sf(p17_utm, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pollen_2017_sf.shp")
 
 ##add in SCS data that are available for 2017
 scs <- read.csv("C:/Users/dsk856/Box/MIpostdoc/LakeshoreENT_pollen_counts_2009_2017_compiled.csv") %>% 
@@ -48,6 +50,51 @@ p18 <- read_csv("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/airborne_p_
 p18_utm <- st_as_sf(p18, coords = c("long", "lat"), crs = 4326) 
 p18_utm <- st_transform(p18_utm, 32617) #set as UTM 17
 
+write_sf(p18_utm, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pollen_2018_sf.shp")
+
+p18_utm_inAOI <- st_join(p18_utm, d_wv2_boundary_utm) %>%  #filter out the observations that are from outside of the oak ID area
+  filter(!is.na(is_D))
+
+### using linear interpolation to fill in three missing observations
+# visualize missing data during the peak of the season (5 sampling days with highest concentrations)
+p18_utm_inAOI %>% 
+  filter(date > ymd("2018-05-05") & date < ymd("2018-05-25")) %>% 
+  #ggplot(aes(x = date, y = site, color = log10(pollen + 1), label = round(pollen))) + geom_text(size = 5) + theme_bw() + scale_color_viridis_c()
+  ggplot(aes(x = date, y = pollen, color = site)) + geom_point() + geom_line() + theme_bw() + scale_color_viridis_d()  
+
+# p18_inAOI <- p18_utm_inAOI 
+# p18_inAOI$geometry <- NULL
+# test <- 
+# p18 %>% 
+# group_by(site) %>% 
+#   filter(date > ymd("2018-05-05") & date < ymd("2018-05-29")) %>% 
+#   mutate(dates = paste0(month(date),"_",mday(date))) %>% 
+#   dplyr::select(site, dates, pollen) %>% 
+#   pivot_wider(names_from = dates, values_from = pollen, names_prefix = "pol_") %>% 
+#   mutate(may_17_14_perc = pol_5_17/pol_5_14)
+
+
+#interpolation 
+p18_inAOI_NAs <- tibble(date = c(ymd("2018-05-17"), ymd("2018-05-21"), ymd("2018-05-21")),  #observations I'll be interpolating
+                        site = c("I", "T", "D"), 
+                        pollen = c(NA,NA,NA))
+p18_geo <- dplyr::select(p18_utm_inAOI, site) %>% unique() #getting the geometry for each site #str(p18_geo) #str(p18_inAOI_NAs)
+p18_inAOI_NAs <- left_join(p18_inAOI_NAs, p18_geo) #add the geometry to the NA tibble
+p18_utm_inAOI_NAs <- bind_rows(p18_utm_inAOI, p18_inAOI_NAs)%>% #add the NA values (with geometry) to the larger dataframe
+  arrange(site, date) %>% 
+  mutate(pollen_interp = imputeTS::na_interpolation(pollen)) #linear interpolation of 3 missing pollen observations
+
+p18_utm_inAOI_NAs %>% #visualize some data
+  filter(date > ymd("2018-05-01") & date < ymd("2018-05-29")) %>% 
+  ggplot(aes(x = date, y = site, color = log(pollen + 1), label = round(pollen_interp))) + geom_text(size = 5) + theme_bw() + scale_color_viridis_c()
+  #ggplot(aes(x = date, y = pollen_interp, color = site)) + geom_point() + geom_line() + theme_bw() + scale_color_viridis_d()  
+
+p18_peak_season <- 
+  p18_utm_inAOI_NAs %>% 
+  filter(date > ymd("2018-05-05") & date < ymd("2018-05-22")) %>% 
+  group_by(site) %>% 
+  summarize(oak_season_mean = mean(pollen_interp))   
+
 
 
 ### data assembly: tree location and pollen production map ##############################################
@@ -64,13 +111,16 @@ p_Quru <- filter(tree_pred, prdctd_ == "Quercus") %>%  dplyr::select(area)
 p_Quru$predpollen <- p_Quru$area * 0.97 + 17.02 #using equation for red oak
 write_sf(p_Quru, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pred_qusp_pol_prod200310.shp")
 p_Quru <- read_sf("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pred_qusp_pol_prod200310.shp")
+sum(p_Quru$predpollen) * 1000000 #convert to actual number (was originally in millions)
 
-#create a blank raster with approximately 100 x 100 m pixel size
-d_rast <- raster(ncol = 145, nrow = 212) 
-extent(d_rast) <- extent(tree_pred)
+
+# #create a blank raster with approximately 100 x 100 m pixel size
+# d_rast <- raster(ncol = 145, nrow = 212) 
+# extent(d_rast) <- extent(p_Quru)
 
 d_rast_10m <- raster(ncol = 1453, nrow = 2116) #approximately 10 x 10 m pixel size
-extent(d_rast_10m) <- extent(tree_pred)
+extent(d_rast_10m) <- extent(p_Quru)
+
 d_rast <- d_rast_10m
 
 trees_as_points <- p_Quru %>% st_cast("POINT", do_split = FALSE)
@@ -80,8 +130,8 @@ p_rast <- (p_rast/ pixel_area) * 1000000 #convert to pol/m2 (was originally in m
 p_rast[p_rast < 0] <- 0 #make sure that none of the trees have values below 0
 #p_rast[is.na(p_rast)] <- 0 #set cells with no oak tree (but within extent of tree map) to zero
 crs(p_rast) <- CRS('+init=EPSG:32617')
-plot(p_rast)
-projection(p_rast)
+# plot(p_rast)
+# projection(p_rast)
 
 # Setting zeroes vs NA values
 #load in a shapefile that has Detroit's boundary clipped to the middle tile of WV2 imagery (i.e., the area of tree ID project)
@@ -94,6 +144,7 @@ d_wv2_boundary_utm <- st_transform(d_wv2_boundary, 32617)
 # plot(st_geometry(d_wv2_boundary_utm), add = TRUE)
 p_rast <- raster::mask(x = p_rast, mask = d_wv2_boundary_utm)
 
+plot(p_rast)
 
 #writeRaster(p_rast, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_200302.tif", format="GTiff")
 #p_rast <- raster("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_200302.tif")
@@ -285,111 +336,302 @@ list.files(path = ".", pattern = "*.png", full.names = T) %>%
 
 
 ### Fig 2: comparing pollen release over space with airborne pollen concentrations ######################
-#comparing 2017 data
-p17_total_season <- p17_utm %>% 
-  group_by(name) %>% 
-  summarize(oak_season_mean = mean(oak_mean))
+# 2017 data: 
+# ultimately, I don't think this is a good comparison, because the samples were not collected simultaneously, 
+# and each one is over a short duration
+#
+# p17_total_season <- p17_utm %>% 
+#   group_by(name) %>% 
+#   summarize(oak_season_mean = mean(oak_mean))
+# 
+# plot(p_rast)
+# plot(st_geometry(p17_total_season), add = TRUE)
+# 
+# distance_loop <- c(seq(from = 100, to = 2000, by = 100)) #, seq(from = 1000, to = 10000, by = 1000) #distance_loop <- 400
+# 
+# #create a table to hold results
+# results_df <- data.frame(distance = rep(NA, length(distance_loop)), R2 = rep(NA, length(distance_loop)), MAE = rep(NA, length(distance_loop)),
+#                          RMSE = rep(NA, length(distance_loop)), AIC = rep(NA, length(distance_loop)))
+# results_df_log10 <- data.frame(distance = rep(NA, length(distance_loop)), R2 = rep(NA, length(distance_loop)), MAE = rep(NA, length(distance_loop)),
+#                                RMSE = rep(NA, length(distance_loop)), AIC = rep(NA, length(distance_loop)))
+# 
+# for(i in 1:length(distance_loop)){
+#   pollen_within_distance_x <- raster::extract(p_rast, p17_total_season, fun = mean, buffer = distance_loop[i], na.rm = TRUE)
+#   
+#   p17_total_season2 <- p17_total_season %>% 
+#     mutate(pollen_within_dist_x = pollen_within_distance_x) %>% 
+#     filter(!is.na(pollen_within_distance_x)) #%>% filter(oak_season_mean < 300)
+#   
+#   panel_a <- p17_total_season2 %>% 
+#     ggplot(aes(x = pollen_within_dist_x, y = oak_season_mean)) + geom_point() + theme_bw() + 
+#     geom_smooth(method = "lm", se = FALSE, formula = y~log10(x)) + 
+#     geom_smooth(method = "lm", se = FALSE, color = "red") + 
+#     ggtitle(distance_loop[i]) #+ xlim(0, 20000)
+#   
+#   panel_b <- p17_total_season2 %>% 
+#     ggplot(aes(x = pollen_within_dist_x + 1, y = oak_season_mean)) +  theme_bw() + geom_smooth(method = "lm", se = FALSE) + 
+#     geom_point(aes(color = name)) + scale_x_log10(labels = comma) + scale_y_log10()+ annotation_logticks()+ theme(panel.grid.minor = element_blank())+
+#     ggtitle(distance_loop[i]) #+ xlim(0, 20000)
+#   
+#   both_panels <- cowplot::plot_grid(panel_a, panel_b)
+#   print(both_panels)
+#   
+#   fit <- glm(p17_total_season2$oak_season_mean ~ p17_total_season2$pollen_within_dist_x )
+#   fit_log10 <- glm(log10(p17_total_season2$oak_season_mean) ~ log10(p17_total_season2$pollen_within_dist_x + 1))
+#   
+#   results_df$distance[i] <- distance_loop[i]
+#   results_df$R2[i] <- caret::R2(fit$fitted.values, p17_total_season2$oak_season_mean )
+#   results_df$MAE[i] <- caret::MAE(fit$fitted.values, p17_total_season2$oak_season_mean )
+#   results_df$RMSE[i] <- caret::RMSE(fit$fitted.values, p17_total_season2$oak_season_mean )
+#   results_df$AIC[i] <- summary(fit)$aic
+#   
+#   results_df_log10$distance[i] <- distance_loop[i]
+#   results_df_log10$R2[i] <- caret::R2(fit_log10$fitted.values, p17_total_season2$oak_season_mean )
+#   results_df_log10$MAE[i] <- caret::MAE(fit_log10$fitted.values, p17_total_season2$oak_season_mean )
+#   results_df_log10$RMSE[i] <- caret::RMSE(fit_log10$fitted.values, p17_total_season2$oak_season_mean )
+#   results_df_log10$AIC[i] <- summary(fit_log10)$aic
+# }
+# 
+# 
+# results_df
+# results_df_log10
 
-plot(p_rast)
-plot(st_geometry(p17_total_season), add = TRUE)
-
-distance_loop <- c(seq(from = 100, to = 1000, by = 100), seq(from = 1000, to = 10000, by = 1000))
-
-for(i in 1:length(distance_loop)){
-pollen_within_distance_x <- raster::extract(p_rast, p17_total_season, fun = mean, buffer = distance_loop[i], na.rm = TRUE)
-
-p17_total_season <- p17_total_season %>% 
-  mutate(pollen_within_dist_x = pollen_within_distance_x) 
-
-print(p17_total_season %>% 
-  ggplot(aes(x = pollen_within_dist_x, y = oak_season_mean)) + geom_point() + theme_bw() + geom_smooth(method = "lm", se = FALSE) 
-)
-
-print(c(distance_loop[i],
-  summary(lm(p17_total_season$oak_season_mean ~p17_total_season$pollen_within_dist_x))$r.squared))
-}
 
 
 
 
 #comparing 2018 data
-plot(p_rast)
-p18_total_season <- p18_utm %>% 
-  group_by(site) %>% 
-  summarize(oak_season_mean = mean(pollen))
+# plot(p_rast)
+# plot(st_geometry(p18_total_season), add = FALSE, pch = 4)
+p18_total_season <- p18_peak_season
 
-plot(st_geometry(p18_total_season), add = TRUE, pch = 4)
+distance_loop <- c(seq(from = 100, to = 2000, by = 100)) #, seq(from = 1000, to = 10000, by = 1000) #distance_loop <- 400
 
+#create a table to hold results
+results_df <- data.frame(distance = rep(NA, length(distance_loop)), R2 = rep(NA, length(distance_loop)), MAE = rep(NA, length(distance_loop)),
+                    RMSE = rep(NA, length(distance_loop)), AIC = rep(NA, length(distance_loop)))
+results_df_log10 <- data.frame(distance = rep(NA, length(distance_loop)), R2 = rep(NA, length(distance_loop)), MAE = rep(NA, length(distance_loop)),
+                    RMSE = rep(NA, length(distance_loop)), AIC = rep(NA, length(distance_loop)))
 
 for(i in 1:length(distance_loop)){
   pollen_within_distance_x <- raster::extract(p_rast, p18_total_season, fun = mean, buffer = distance_loop[i], na.rm = TRUE)
   
-  p18_total_season <- p18_total_season %>% 
-    mutate(pollen_within_dist_x = pollen_within_distance_x) 
+  p18_total_season2 <- p18_total_season %>% 
+    mutate(pollen_within_dist_x = pollen_within_distance_x) %>% 
+    filter(!is.na(pollen_within_distance_x)) #%>% filter(oak_season_mean < 300)
   
-  print(p18_total_season %>% 
-          ggplot(aes(x = log10(pollen_within_dist_x + 1), y = oak_season_mean)) + geom_point() + theme_bw() + geom_smooth(method = "lm", se = FALSE) + 
-          ggtitle(distance_loop[i]) #+ xlim(0, 20000)
-  )
+  panel_a <- p18_total_season2 %>% 
+    ggplot(aes(x = pollen_within_dist_x, y = oak_season_mean)) + geom_point() + theme_bw() + 
+    geom_smooth(method = "lm", se = FALSE, formula = y~log10(x)) + 
+    geom_smooth(method = "lm", se = FALSE, color = "red") + 
+    ggtitle(distance_loop[i]) #+ xlim(0, 20000)
   
-  print(c(distance_loop[i],
-          summary(lm(p18_total_season$oak_season_mean ~ log10(p18_total_season$pollen_within_dist_x + 1)))$r.squared,
-          summary(glm(p18_total_season$oak_season_mean ~ log10(p18_total_season$pollen_within_dist_x + 1)))$aic))
+  panel_b <- p18_total_season2 %>% 
+    ggplot(aes(x = pollen_within_dist_x + 1, y = oak_season_mean)) +  theme_bw() + geom_smooth(method = "lm", se = FALSE) + 
+    geom_point(aes(color = site)) + scale_x_log10(labels = comma) + scale_y_log10()+ annotation_logticks()+ theme(panel.grid.minor = element_blank())+
+    ggtitle(distance_loop[i]) #+ xlim(0, 20000)
+  
+  both_panels <- cowplot::plot_grid(panel_a, panel_b)
+  print(both_panels)
+  
+  fit <- glm(p18_total_season2$oak_season_mean ~ p18_total_season2$pollen_within_dist_x )
+  fit_log10 <- glm(log10(p18_total_season2$oak_season_mean) ~ log10(p18_total_season2$pollen_within_dist_x + 1))
+  
+  results_df$distance[i] <- distance_loop[i]
+  results_df$R2[i] <- caret::R2(fit$fitted.values, p18_total_season2$oak_season_mean )
+  results_df$MAE[i] <- caret::MAE(fit$fitted.values, p18_total_season2$oak_season_mean )
+  results_df$RMSE[i] <- caret::RMSE(fit$fitted.values, p18_total_season2$oak_season_mean )
+  results_df$AIC[i] <- summary(fit)$aic
+  
+  results_df_log10$distance[i] <- distance_loop[i]
+  results_df_log10$R2[i] <- caret::R2(fit_log10$fitted.values, p18_total_season2$oak_season_mean )
+  results_df_log10$MAE[i] <- caret::MAE(fit_log10$fitted.values, p18_total_season2$oak_season_mean )
+  results_df_log10$RMSE[i] <- caret::RMSE(fit_log10$fitted.values, p18_total_season2$oak_season_mean )
+  results_df_log10$AIC[i] <- summary(fit_log10)$aic
 }
 
-## testing out the siland package -----------------------------
-library(siland)
-data(dataSiland)
-data(landSiland)
-landSiland$L3 <- 1
 
-resF1=Fsiland( obs ~ L3, land=landSiland, data=dataSiland)
-plotFsiland.sif(resF1)
+results_df
+results_df_log10
+# autoplot(fit_log10, which = 1:6, ncol = 3, label.size = 3)
+# autoplot(fit, which = 1:6, ncol = 2, label.size = 3, colour = "steelblue") + theme_bw()
 
-p_Quru2 <- p_Quru %>%  mutate(placeholder = 1) #predpollen
-#p_Quru2 <- st_set_crs(p_Quru2, crs(p18_total_season))
-#p_Quru2 <- sample_frac(p_Quru2, 0.1)
+## boot strapping to get empirical CI values for the best regression (log x log at 400 m buffer)
+pollen_within_distance_400 <- raster::extract(p_rast, p18_total_season, fun = mean, buffer = 400, na.rm = TRUE)
+boot400 <- data.frame(p400 = log10(pollen_within_distance_400), oak_season_mean = log10(p18_total_season2$oak_season_mean),
+                      site = p18_total_season2$site)
 
-p18_total_season2 <- p18_total_season %>%  mutate(X = sf::st_coordinates(.)[,1],
-                             Y = sf::st_coordinates(.)[,2])
-#filter out the observations that are from outside of the oak ID area
-p18_total_season2 <- st_join(p18_total_season2, d_wv2_boundary_utm) %>%  #boundary was loaded in above
-  filter(!is.na(is_D))
-p18_total_season2$geometry <- NULL
+# Bootstrap 95% CI for regression coefficients
+bs <- function(formula, data, indices) {
+  d <- data[indices,] # allows boot to select sample
+  fit <- lm(formula, data=d)
+  return(coef(fit))
+}
+# bootstrapping with 1000 replications
+results <- boot(data=boot400, statistic= bs, R=1000, formula = oak_season_mean ~ p400)
 
+# # view results
+# results
+# plot(results, index=1) # intercept
+# plot(results, index=2) # slope
+# 
+# # get 95% confidence intervals
+# boot.ci(results, type="bca", index=1) # intercept
+# boot.ci(results, type="bca", index=2) # slope
 
-### buffer approach
-resF1= Bsiland(oak_season_mean ~ placeholder, land= p_Quru2, data= p18_total_season2) #takes ~15 min
-resF1 #best buffer size estimated at: 587.704 m, but stays pretty good from ~ 500 m - 1500 m  
-summary(resF1)
+results400_reg <- as.data.frame(results$t) %>% 
+  rename(inter = `V1`, slope = `V2`) %>% 
+  mutate(x = min(boot400$p400),
+         y = inter + slope * x,
+         xend = max(boot400$p400),
+         yend = inter + slope * xend,
+         id = 1:1000) %>% 
+  sample_frac(1) #reduce when doing exploratory figure generation so it renders faster
 
-#a visual comparison of what buffer size has lowest negative log likelihood
-likresB1 = Bsiland.lik(resF1,land= p_Quru2, data=p18_total_season2, varnames=c("placeholder")) #takes a few minutes
-likresB1
+## figure 2: plotting
+boot400 %>% 
+  ggplot(aes(x = 10^p400, y = 10^oak_season_mean)) +  theme_bw() + 
+  geom_segment(data = results400_reg, aes(x = 10^x, y = 10^y, xend = 10^xend, yend = 10^yend, group = id), color = "gray50", alpha = 0.01) +
+  geom_smooth(method = "lm", se = FALSE) + geom_point(size = 2) + coord_cartesian(ylim = c(100, 3000)) +
+  scale_x_log10(labels = comma) + scale_y_log10()+ annotation_logticks()+ theme(panel.grid.minor = element_blank()) +
+  xlab(pollen~production~(pollen~grains/m^2~within~400~m)) + ylab(average~airborne~pollen~(pollen~grains/m^3)) 
+  
+# # Bootstrap 95% CI for R-Squared
+# library(boot)
+# # function to obtain R-Squared from the data
+# rsq <- function(formula, data, indices) {
+#   d <- data[indices,] # allows boot to select sample
+#   fit <- lm(formula, data=d)
+#   return(summary(fit)$r.square)
+# }
+# # bootstrapping with 1000 replications
+# results <- boot(data=boot400, statistic=rsq,
+#                 R=1000, formula = oak_season_mean~p400)
+# 
+# # view results
+# results
+# plot(results)
+# 
+# # get 95% confidence interval
+# boot.ci(results, type="bca")
 
-#map of landscape variable
-plotBsiland.land(x=resF1,land=p_Quru2,data=as.data.frame(p18_total_season2))
-
-
-### continuous approach
-resF2 = Fsiland(oak_season_mean ~ placeholder, land= p_Quru2, data= p18_total_season2, sif = "gaussian", wd = 10)
-#Sys.time()
-resF2
-summary(resF2)
-str(resF2)
-resF2$result$fitted.values
-plotFsiland.sif(resF2)
-Fsiland.quantile(resF2, p = c(0.5, 0.95, 0.99))  #95% of effect is from within 1307 m
-plotFsiland.land(x=resF2,land=p_Quru2, data=p18_total_season2) #takes a minute, but it's a fairly pretty map of risk
-
-
-p18_total_season2 %>% 
-  mutate(fitted.valuess = resF2$result$fitted.values,
-         resid = resF2$result$residuals) %>% 
-  ggplot(aes(x = oak_season_mean, y = fitted.valuess, color = resid)) + geom_point() + geom_abline(slope = 1, intercept = 0, lty = 2) + theme_bw() +
-  xlim(0,600) + ylim(0, 600)
-
-fitted.Fsiland(resF2)
+# ## testing out the siland package -----------------------------
+# library(siland)
+# #data(dataSiland)
+# #data(landSiland)
+# #landSiland$L3 <- 1
+# 
+# #resF1=Fsiland( obs ~ L3, land=landSiland, data=dataSiland)
+# #plotFsiland.sif(resF1)
+# 
+# p_Quru2 <- p_Quru %>%  mutate(placeholder = 1) #predpollen
+# #p_Quru2 <- st_set_crs(p_Quru2, crs(p18_total_season))
+# #p_Quru2 <- sample_frac(p_Quru2, 0.1)
+# 
+# p18_total_season2 <- p18_total_season %>%  mutate(X = sf::st_coordinates(.)[,1],
+#                              Y = sf::st_coordinates(.)[,2])
+# 
+# p18_total_season2$geometry <- NULL
+# p18_total_season2 <- p18_total_season2  %>%  filter(oak_season_mean < 300)
+# 
+# 
+# ### buffer approach
+# resF1= Bsiland(oak_season_mean ~ placeholder, land= p_Quru2, data= p18_total_season2) #takes ~15 min
+# resF1 #best buffer size estimated at: 587.704 m, but stays pretty good from ~ 500 m - 1500 m
+# 1 - (resF1$result$deviance/resF1$result$null.deviance)
+# summary(resF1)
+# str(resF1)
+# buffer_selected <- resF1$coefficients[3]
+# 
+# #a visual comparison of what buffer size has lowest negative log likelihood
+# likresB1 = Bsiland.lik(resF1,land= p_Quru2, data=p18_total_season2, varnames=c("placeholder")) #takes a few minutes
+# 
+# 
+# #map of landscape variable
+# #plotBsiland.land(x=resF1,land=p_Quru2,data=as.data.frame(p18_total_season2))
+# 
+# pollen_within_distance_x <- raster::extract(p_rast, p18_total_season, fun = sum, buffer = buffer_selected, na.rm = TRUE)
+# 
+# p18_total_season <- p18_total_season %>% 
+#   mutate(pollen_within_dist_x = pollen_within_distance_x) 
+# p18_total_season %>% 
+#         ggplot(aes(x = pollen_within_dist_x, y = oak_season_mean)) + geom_point() + theme_bw() + geom_smooth(method = "lm", se = FALSE) + 
+#         ggtitle(distance_loop[i]) #+ xlim(0, 20000)
+# summary( lm(p18_total_season$oak_season_mean ~ p18_total_season$pollen_within_dist_x ))$r.squared
+# summary(glm(p18_total_season$oak_season_mean ~ p18_total_season$pollen_within_dist_x ))$aic
+# 
+# 
+# 
+# ### continuous approach
+# resF2 = Fsiland(oak_season_mean ~ placeholder, land= p_Quru2, data= p18_total_season2, sif = "gaussian", wd = 10) #+I (placeholder^2) 
+# #calculating the Nagelkerke GOF measurement which is about the same as R2 when the GLM is basically the same as the LM
+# #https://stats.stackexchange.com/questions/46345/how-to-calculate-goodness-of-fit-in-glm-r/46358
+# 1 - (resF2$result$deviance/resF2$result$null.deviance)
+# 
+# trace(Fsiland, edit=TRUE)
+# trace(FsilandMinusLoglik, edit=TRUE)
+# #Sys.time()
+# resF2
+# summary(resF2)
+# #str(resF2)
+# #resF2$result$fitted.values
+# plotFsiland.sif(resF2)
+# #?plotFsiland.sif
+# Fsiland.quantile(resF2, p = c(0.5, 0.95, 0.99))  #95% of effect is from within 1307 m
+# # plotFsiland.land(x=resF2,land=p_Quru2, data=p18_total_season2) #takes a minute, but it's a fairly pretty map of risk
+# # test <- plotFsiland.land(x=resF2,land=p_Quru2, data=p18_total_season2, plot = FALSE) #takes a minute, but it's a fairly pretty map of risk
+# # ggplot(data=test, aes_string(x="X", y="Y", fill = "V")) + geom_raster(interpolate = F)+
+# #   scale_fill_gradient2(low="#0000FF",mid="white",high="#CC0000",midpoint=0)+
+# #   coord_fixed()+
+# #   theme_classic() + theme(axis.title=element_blank(),legend.title=element_blank(),legend.position="bottom") 
+# # 
+# # 
+# # test2 <- st_as_sf(test, coords = c("X", "Y"), crs = 32617)
+# # #test2 <- rasterFromXYZ(test)
+# # test3 <- raster(test2) #rasterize(trees_as_points, d_rast, field = "predpollen", fun = sum, na.rm = TRUE)
+# # test4 <- rasterize(test3, test2)
+# # 
+# # 
+# # example_points <- as(test2, "Spatial")
+# # empty_raster <- raster(test2, ncol = (max(test$X) - min(test$X))/200, nrow = (max(test$Y) - min(test$Y))/200)
+# # # Generate empty raster layer and rasterize points
+# # example_raster <- #raster(test2) %>%
+# #   rasterize(example_points, empty_raster)
+# # example_raster2 <- example_raster$V
+# # example_raster2[100:1100]
+# # plot(example_raster2)
+# # example_raster3 <- raster::mask(x = example_raster2, mask = d_wv2_boundary_utm)
+# # plot(example_raster3)
+# # 
+# # writeRaster(example_raster3, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/qusp_Fsiland_210528.tif")
+# 
+# #str(resF2)
+# p18_total_season2 %>% 
+#   mutate(fitted.valuess = resF2$result$fitted.values,
+#          resid = resF2$result$residuals) %>% 
+#   ggplot(aes(x = oak_season_mean, y = fitted.valuess, color = resid)) + geom_point() + geom_abline(slope = 1, intercept = 0, lty = 2) + theme_bw() 
+#   #xlim(0,600) + ylim(0, 600)
+# 
+# p18_total_season2 %>% 
+#   mutate(landcontri = resF2$landcontri,
+#          fitted.valuess = resF2$result$fitted.values) %>% 
+#   ggplot(aes(x = landcontri , y = oak_season_mean, color = fitted.valuess)) + geom_point() + geom_abline(slope = 1, intercept = 0, lty = 2) + 
+#   theme_bw() + geom_smooth(method = "lm", se = FALSE)
+#   
+# 
+# summary(lm(p18_total_season2$oak_season_mean ~ resF2$landcontri))
+# 
+# fitted.Fsiland(resF2)
+# 
+# resF2$landcontri
+# resF2$result$model$placeholder
+# 
+# resF2$result$linear.predictors
+# resF2$result$fitted.values
+# 
+# resF2$result$effects
+# 
+# plot(resF2$landcontri, resF2$result$fitted.values)
 
 ### Fig 3: comparing pollen release over space and time with airborne pollen concentrations #############
 p2017_sf_utm17$p_prod_day_1km <- NA
