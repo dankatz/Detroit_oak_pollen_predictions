@@ -27,7 +27,7 @@ p17 <- read_csv("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pollen_2017
            taxa3 = "italic(Quercus)")
 p17_utm <- st_as_sf(p17, coords = c("long", "lat"), crs = 4326)
 p17_utm <- st_transform(p17_utm, 32617)
-p17_utm %>% dplyr::select(name) %>% plot(cex = 5, pch = 17)
+#p17_utm %>% dplyr::select(name) %>% plot(cex = 5, pch = 17)
 #write_sf(p17_utm, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pollen_2017_sf.shp")
 
 ##add in SCS data that are available for 2017
@@ -59,8 +59,16 @@ d_wv2_boundary <- read_sf("C:/Users/dsk856/Box/MIpostdoc/Detroit spatial data/De
 d_wv2_boundary_utm <- st_transform(d_wv2_boundary, 32617)
 
 #only include observations from sites within the AOI
-p18_utm_inAOI <- st_join(p18_utm, d_wv2_boundary_utm) %>%  #filter out the observations that are from outside of the oak ID area
-  filter(!is.na(is_D))
+p18_utm_inAOI <- st_join(p18_utm, d_wv2_boundary_utm) %>%  #dplyr::select(is_D) %>% plot()
+  filter(!is.na(is_D))#filter out the observations that are from outside of the oak ID area
+
+#what is peak pollen season for oak trees
+p18_utm_inAOI %>% 
+  mutate(peak_season = case_when(date > ymd("2018-05-05") & date < ymd("2018-05-25") ~ "peak",
+                                 date < ymd("2018-05-05") ~ "not_peak",
+                                 date > ymd("2018-05-25") ~ "not_peak")) %>% 
+  group_by(peak_season) %>% 
+  summarize(total_pollen = sum(pollen)) #1 - 493/(34698 + 493)
 
 ### using linear interpolation to fill in three missing observations
 # visualize missing data during the peak of the season (5 sampling days with highest concentrations)
@@ -102,7 +110,7 @@ p18_peak_season <-
   group_by(site) %>% 
   summarize(oak_season_mean = mean(pollen_interp))   
 
-
+#15* 5 - 3
 
 ### data assembly: tree location and pollen production map ##############################################
 # a map of oak trees in the central portion of Detroit is described in Katz et al. 2020:
@@ -121,10 +129,6 @@ p_Quru <- read_sf("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pred_qusp
 sum(p_Quru$predpollen) * 1000000 #convert to actual number (was originally in millions)
 
 
-# #create a blank raster with approximately 100 x 100 m pixel size
-# d_rast <- raster(ncol = 145, nrow = 212) 
-# extent(d_rast) <- extent(p_Quru)
-
 #create a blank raster with approximately 10 x 10 m pixel size
 d_rast_10m <- raster(ncol = 1452, nrow = 2030) #approximately 10 x 10 m pixel size: ncol = 1452, nrow = 2030
 extent(d_rast_10m) <- extent(p_Quru)
@@ -135,25 +139,16 @@ p_rast <- rasterize(trees_as_points, d_rast, field = "predpollen", fun = sum, na
 pixel_area <- (res(p_rast)[1] * res(p_rast)[2]) #get pixel area in m2
 p_rast <- (p_rast/ pixel_area) * 1000000 #convert to pol/m2 (was originally in millions)
 p_rast[p_rast < 0] <- 0 #make sure that none of the trees have values below 0
-#p_rast[is.na(p_rast)] <- 0 #set cells with no oak tree (but within extent of tree map) to zero
-crs(p_rast) <- CRS('+init=EPSG:32617')
-# plot(p_rast)
-# projection(p_rast)
-p_rast_export <- p_rast
-writeRaster(p_rast_export, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_10m_210611.tif", 
-            format="GTiff", overwrite = TRUE)
+p_rast[is.na(p_rast)] <- 0 #set cells with no oak tree (but within extent of tree map) to zero
+crs(p_rast) <- CRS('+init=EPSG:32617') # plot(p_rast) # projection(p_rast)
 
-#set NA values in that area to 0
-# p_rast
-# plot(st_geometry(p17_total_season), add = TRUE)
-# plot(st_geometry(d_wv2_boundary_utm), add = TRUE) #this was loaded earlier in script
+
 p_rast <- raster::mask(x = p_rast, mask = d_wv2_boundary_utm)
-
 plot(p_rast)
+# plot(st_geometry(d_wv2_boundary_utm), add = TRUE) #this was loaded earlier in script
 
-#writeRaster(p_rast, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_210611.tif", format="GTiff", overwrite = TRUE)
-#p_rast <- raster("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_200302.tif") #old version
-
+# writeRaster(p_rast, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_10m_210615.tif",
+#             format="GTiff", overwrite = TRUE)
 
 
 
@@ -275,12 +270,12 @@ for(i in 1:length(distance_loop)){
 
 
 results_df
-results_df_log10 #writeClipboard(as.character(round(results_df_log10, 3)))
+round(results_df_log10, 3) #writeClipboard(as.character(round(results_df_log10, 3)))
 # autoplot(fit_log10, which = 1:6, ncol = 3, label.size = 3)
 # autoplot(fit, which = 1:6, ncol = 2, label.size = 3, colour = "steelblue") + theme_bw()
 
 ## boot strapping to get empirical CI values for the best regression (log x log at x m buffer)
-pollen_within_distance_xm <- raster::extract(p_rast, p18_total_season, fun = mean, buffer = 700, na.rm = TRUE)
+pollen_within_distance_xm <- raster::extract(p_rast, p18_total_season, fun = mean, buffer = 1300, na.rm = TRUE)
 bootxm <- data.frame(pxm = log10(pollen_within_distance_xm + 1), oak_season_mean = log10(p18_total_season2$oak_season_mean + 1),
                       site = p18_total_season2$site)
 
@@ -333,7 +328,7 @@ results <- boot(data=bootxm, statistic=rsq,
 
 # view results
 results
-plot(results)
+# plot(results)
 
 # get 95% confidence interval
 boot.ci(results, type="bca")
@@ -344,7 +339,7 @@ boot.ci(results, type="bca")
 # the focal function  doesn't work with a circular mean, using Terra::focal instead
 #https://gis.stackexchange.com/questions/358923/how-can-i-get-the-correct-mean-from-focal-with-a-circular-window?noredirect=1&lq=1
 library(terra)
-focal_distance_selected <- 700 #based on distance selection table (above)
+focal_distance_selected <- 1300 #based on distance selection table (above)
 
 p_rast_AOI <- p_rast
 p_rast_AOI[is.na(p_rast_AOI)] <- 0 #turning false NA values to 0
@@ -364,12 +359,12 @@ p_spat_rast_focal2 <- raster::raster(p_spat_rast_focal1)
 p_spat_rast_focal3 <- raster::mask(p_spat_rast_focal2, d_wv2_boundary_utm)
 plot(p_spat_rast_focal3)
 writeRaster(p_spat_rast_focal3,  overwrite = TRUE, 
-            "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_season_210614d.tif", format="GTiff")
+            "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_season_210615a.tif", format="GTiff")
 
 p_spat_rast_focal4 <- log10(p_spat_rast_focal3 + 1)
 plot(p_spat_rast_focal4)
 writeRaster(p_spat_rast_focal4,  overwrite = TRUE, 
-            "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_log10_season_210614d.tif", format="GTiff")
+            "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_log10_season_210615a.tif", format="GTiff")
 
 
 
@@ -497,11 +492,6 @@ writeRaster(p_spat_rast_focal4,  overwrite = TRUE,
 
 
 ### Fig 3: create pollen release surfaces for each day  #######################################
-# setwd("C:/Users/dsk856/Box/MIpostdoc/Detroit spatial data/Detroit boundary/Detroit_boundary_shapefile")
-# d_bound <- rgdal::readOGR(".", layer="POLYGON")
-# d_bound_utm <- st_as_sf(d_bound)
-# d_bound_utm <- st_transform(d_bound_utm, crs(d_peak))
-# d_bound_utm <- sf:::as_Spatial(d_bound_utm)
 
 #total pollen production in AOI as a 10m raster
 p_rast_AOI
@@ -529,38 +519,39 @@ d_peak <- d_peak + 3 # 3 > 2 > 4> 5 > 0
 #load in lookup table
 pflow_lookup_summary <- read.csv("C:/Users/dsk856/Box/MIpostdoc/trees/Phenology and daily variation in pollen release/pflow_lookup_summary.csv") 
 #apply this function to create a raster for each day with the percent flowering
+#the proportion of all active flowers that were going on that day
+pflow_lookup_summary$prop_pollen <- pflow_lookup_summary$mean_flow/sum(pflow_lookup_summary$mean_flow) #changing season total to 1
+#pflow_lookup_summary$mean_flow <- pflow_lookup_summary$mean_flow / 100
 pflow_lookup_summary$days_from_site_mean_low <-  pflow_lookup_summary$days_from_site_mean - 0.5
 pflow_lookup_summary$days_from_site_mean_hi <-  pflow_lookup_summary$days_from_site_mean + 0.5
-pflow_lookup_summary2 <- cbind(pflow_lookup_summary$days_from_site_mean_low, pflow_lookup_summary$days_from_site_mean_hi,
-                               pflow_lookup_summary$mean_flow)
+  pflow_lookup_summary2 <- cbind(pflow_lookup_summary$days_from_site_mean_low, pflow_lookup_summary$days_from_site_mean_hi,
+                               pflow_lookup_summary$prop_pollen)
+
 
 #creating a stack that has percent flowering on each day
 flower_stack <- stack()
 for(i in 110:145){
   focal_day <- i
-  test2 <- focal_day - d_peak 
-  test3 <- reclassify(test2, pflow_lookup_summary2)
-  names(test3) <- paste("flow_", focal_day, sep = "")
-  plot(test3, main = focal_day)
-  flower_stack <- stack(flower_stack, test3)
+  days_from_peak <- focal_day - d_peak 
+  flowering_on_day_x <- reclassify(days_from_peak, pflow_lookup_summary2)
+  names(flowering_on_day_x) <- paste("flow_", focal_day, sep = "")
+  plot(flowering_on_day_x, main = focal_day)
+  flower_stack <- stack(flower_stack, flowering_on_day_x)
 }
-flower_stack <- flower_stack * 0.01 #Changing percentage to proportion
 
 #pollen release on each day
-p_per_day_stack <- p_rast * flower_stack #plot(p_per_day_stack[[20]])
+p_per_day_stack <- p_rast * flower_stack #plot(p_per_day_stack[[10]]) #plot(p_rast)
 
+p_per_day_stack2 <- p_per_day_stack #plot(p_per_day_stack)
+#this was already done on p_rast # p_per_day_stack2[is.na(p_per_day_stack2)] <- 0 #set na values to 0 (they weren't really NA) #takes ~3 min
+# p_per_day_stack2 <- mask(p_per_day_stack2,  d_wv2_boundary_utm) #set all values outside of AOI to NA
 
 
 ## Fig 3: assessing different distance buffers -------------------------------------------------------------
-p_per_day_stack2 <- p_per_day_stack
-p_per_day_stack2[is.na(p_per_day_stack2)] <- 0 #set na values to 0 (they weren't really NA) #takes ~3 min
-p_per_day_stack2 <- mask(p_per_day_stack2,  d_wv2_boundary_utm) #set all values outside of AOI to NA
-
-
 p17_utm2 <- st_join(p17_utm, d_wv2_boundary_utm) %>% 
   filter(is_D == "d") #%>% filter(oak_season_mean < 300)
 
-distance_loop <- c(seq(from = 100, to = 2000, by = 100)) #, seq(from = 1000, to = 10000, by = 1000) #distance_loop <- c(400, 600)
+distance_loop <- c(seq(from = 100, to = 3000, by = 100)) #, seq(from = 1000, to = 10000, by = 1000) #distance_loop <- c(400, 600)
 
 #create a table to hold results
 results_df <- data.frame(distance = rep(NA, length(distance_loop)), R2 = rep(NA, length(distance_loop)), MAE = rep(NA, length(distance_loop)),
@@ -618,11 +609,7 @@ round(results_df_log10, 3)
 
 
 ## creating fig 3A using the distance selected above ---------------------------------------------------
-focal_distance_selected <- 1000
-
-p_per_day_stack2 <- p_per_day_stack
-p_per_day_stack2[is.na(p_per_day_stack2)] <- 0 #set na values to 0 (they weren't really NA) #takes ~3 min
-p_per_day_stack2 <- mask(p_per_day_stack2,  d_wv2_boundary_utm) #set all values outside of AOI to NA
+focal_distance_selected <- 2200
 
 p17_utm3 <- st_join(p17_utm, d_wv2_boundary_utm) %>% 
   filter(is_D == "d") %>% 
@@ -646,11 +633,80 @@ ggplot(p17_utm3, aes(x = p_prod_day_xm +1, y = oak_mean + 1)) + geom_point(alpha
   scale_x_log10(labels = comma) + scale_y_log10() + annotation_logticks() +
   theme(panel.grid.minor = element_blank())
 
-fit <- lm(p17_utm3$oak_mean  ~ p17_utm3$p_prod_day_xm)
-summary(fit)
+# fit <- lm(p17_utm3$oak_mean  ~ p17_utm3$p_prod_day_xm)
+# summary(fit)
 
 fit <- lm(log10(p17_utm3$oak_mean + 1) ~ log10(p17_utm3$p_prod_day_xm + 1))
 summary(fit)
+
+
+
+### create animation of pollen release within selected distance for each day ###########################
+library(terra)
+setwd("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/animation_release_per_day2.2km/")
+focal_distance_selected <- 2200 #based on distance selection table (above)
+
+#plot(p_per_day_stack2[[10]])
+p_per_day_spat_rast <- terra::rast(p_per_day_stack2) #convert to terra format #plot(p_rast) #plot(p_spat_rast)
+p_per_day_spat_rast2 <- terra::aggregate(p_per_day_spat_rast, fact = 5, fun = "mean", na.rm =TRUE) #just to speed up getting to the visualization
+#plot(p_per_day_spat_rast[[10]])
+
+#focal weight matrix
+fwModel <- focalMat(x = p_per_day_spat_rast2, d = focal_distance_selected, type = "circle")
+fwModel[fwModel > 0] <- 1
+fwModel[fwModel == 0] <- NA
+
+
+#create each still image
+for(i in 1:36){
+focal_day_raster <- i #focal_day_raster <- 20
+#note that the focal function in terra only works one layer at a time at the moment
+p_per_day_spat_rast2_focal1 <- terra::focal(x= p_per_day_spat_rast2[[focal_day_raster]], 
+                                            w = fwModel, fun = "mean", na.rm = TRUE) #takes 2 min at r = 70 cells
+#plot(p_spat_rast_focal1); plot(d_wv2_boundary_utm, add = TRUE, color = NA)
+p_per_day_spat_rast2_focal2 <- raster::raster(p_per_day_spat_rast2_focal1)
+p_per_day_spat_rast2_focal3 <- raster::mask(p_per_day_spat_rast2_focal2, d_wv2_boundary_utm)
+
+date_title <- paste("pollen release on:\n", as.Date((109 + i), origin = "2016-12-31"),"\n ") #convert Julian to date
+
+
+#save a png for each date
+png(filename=paste("D_qf2_",109 + i,".png", sep = ""), width = 600, height = 800, units = "px")
+
+print(
+  tm_shape(p_per_day_spat_rast2_focal3 + 1) + 
+  tm_raster(title = "grains/m\u00b2/day",  #have to use unicode to sneak in the superscript
+            legend.reverse = TRUE,
+            #legend.is.portrait = FALSE,
+            breaks = c(1,5,10, 50,100,500, 1000,5000,10000,50000),
+            style = "cont", #style = "log10",
+            labels = c("1","5","10","50","100","500","1,000","5,000","10,000","50,000"),
+            palette = "-viridis")+
+  tm_legend(outside = TRUE, legend.text.size = 1.0) + 
+  tm_compass() +
+  tm_scale_bar(breaks = c(0,2), text.size = 1) +
+  tm_layout(scale = 1.2,
+            legend.position = c("left", "top"), 
+            legend.title.size = 1.5,
+            title= date_title,
+            title.size = 1.2,
+            title.position = c('left', 'top') 
+            )
+)
+dev.off()
+} #end day loop
+
+
+#creating an animation
+library(magick)
+list.files(path = ".", pattern = "*.png", full.names = T) %>%
+  purrr::map(image_read) %>% # reads each path file
+  image_join() %>% # joins image
+  image_animate(fps=1) %>% # animates, can opt for number of loops
+  image_write("oak_pollen_prod_in_Detroit_v2.gif") # write to current dir
+
+
+
 
 
 ## compare SCS estimate with my pollen prod estimate for each obs -----------------------------
@@ -665,7 +721,7 @@ scs <- read.csv("C:/Users/dsk856/Box/MIpostdoc/LakeshoreENT_pollen_counts_2009_2
 
 p17_utm4 <- left_join(p17_utm3, scs_c)
 
-#predict airborne pollen for each obs based on my pollen production regression
+#predict airborne pollen for each obs based on scs data
 fit <- lm(p17_utm4$oak_mean ~ p17_utm4$scs_oak)
 summary(fit)
 fit <- lm(log10(p17_utm4$oak_mean + 1) ~ log10(p17_utm4$scs_oak + 1))
