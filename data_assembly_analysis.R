@@ -222,7 +222,7 @@ plot(p_rast)
 # plot(st_geometry(p18_total_season), add = FALSE, pch = 4)
 p18_total_season <- p18_peak_season
 
-distance_loop <- c(seq(from = 100, to = 2000, by = 100)) #, seq(from = 1000, to = 10000, by = 1000) #distance_loop <- 400
+distance_loop <- c(seq(from = 100, to = 3000, by = 100)) #, seq(from = 1000, to = 10000, by = 1000) #distance_loop <- 400
 
 #create a table to hold results
 results_df <- data.frame(distance = rep(NA, length(distance_loop)), R2 = rep(NA, length(distance_loop)), MAE = rep(NA, length(distance_loop)),
@@ -335,7 +335,7 @@ boot.ci(results, type="bca")
 
 
 
-# saving the raster with the average at the selected distance (700 m) -------------------------------------
+# saving the raster with the average at the selected distance (1300 m) -------------------------------------
 # the focal function  doesn't work with a circular mean, using Terra::focal instead
 #https://gis.stackexchange.com/questions/358923/how-can-i-get-the-correct-mean-from-focal-with-a-circular-window?noredirect=1&lq=1
 library(terra)
@@ -364,7 +364,7 @@ writeRaster(p_spat_rast_focal3,  overwrite = TRUE,
 p_spat_rast_focal4 <- log10(p_spat_rast_focal3 + 1)
 plot(p_spat_rast_focal4)
 writeRaster(p_spat_rast_focal4,  overwrite = TRUE, 
-            "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_log10_season_210615a.tif", format="GTiff")
+            "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_log10_season_210628a.tif", format="GTiff")
 
 
 
