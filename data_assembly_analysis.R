@@ -108,8 +108,11 @@ p18_peak_season <-
   p18_utm_inAOI_NAs %>% 
   filter(date > ymd("2018-05-05") & date < ymd("2018-05-22")) %>% 
   group_by(site) %>% 
-  summarize(oak_season_mean = mean(pollen_interp))   
+  summarize(oak_mean = mean(pollen_interp)) %>% 
+  mutate(m_l10 = log10(oak_mean))   
 
+p18_peak_season
+#write_sf(p18_peak_season, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pollen_peak_mean_2018_sfb.shp", overwrite= TRUE)
 #15* 5 - 3
 
 ### data assembly: tree location and pollen production map ##############################################
@@ -124,14 +127,15 @@ p18_peak_season <-
 # Pollen production for 13 urban North American tree species: allometric equations for tree trunk diameter and crown area
 
 #p_Quru$predpollen <- p_Quru$area * 0.97 + 17.02 #using equation for red oak
-#write_sf(p_Quru, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pred_qusp_pol_prod200310.shp")
-p_Quru <- read_sf("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pred_qusp_pol_prod200310.shp")
+#write_sf(p_Quru, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pred_qusp_pol_prod210723.shp")
+p_Quru <- read_sf("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pred_qusp_pol_prod210723.shp")
 sum(p_Quru$predpollen) * 1000000 #convert to actual number (was originally in millions)
 
 
 #create a blank raster with approximately 10 x 10 m pixel size
-d_rast_10m <- raster(ncol = 1452, nrow = 2030) #approximately 10 x 10 m pixel size: ncol = 1452, nrow = 2030
-extent(d_rast_10m) <- extent(p_Quru)
+d_rast_10m <- raster(ncol = 1453, nrow = 2116) #approximately 10 x 10 m pixel size: ncol = 1452, nrow = 2030
+extent(d_rast_10m) <- extent(tree_pred)
+d_rast_10m
 d_rast <- d_rast_10m
 
 trees_as_points <- p_Quru %>% st_cast("POINT", do_split = FALSE)
@@ -307,13 +311,43 @@ resultsxm_reg <- as.data.frame(results$t) %>%
   sample_frac(1) #reduce when doing exploratory figure generation so it renders faster
 
 ## figure 2: plotting
-bootxm %>% 
+
+#set the y-axis color line dataframe                        
+ymin_v <- (seq(100, 3000, length.out = 100))
+ymax_v <- c(test[2:100], 3030)
+site_poll_rect_df <- data.frame(xmin = c(rep(500, 100)), xmax = c(rep(520, 100)), 
+                                ymin = ymin_v, ymax = ymax_v)
+
+fig_1_inset <- bootxm %>% 
   ggplot(aes(x = 10^pxm, y = 10^oak_season_mean)) +  theme_bw() + 
-  geom_segment(data = resultsxm_reg, aes(x = 10^x, y = 10^y, xend = 10^xend, yend = 10^yend, group = id), color = "gray50", alpha = 0.01) +
-  geom_smooth(method = "lm", se = FALSE) + geom_point(size = 2) + coord_cartesian(ylim = c(100, 3000)) +
-  scale_x_log10(labels = comma) + scale_y_log10()+ annotation_logticks()+ theme(panel.grid.minor = element_blank()) +
-  xlab(pollen~production~(pollen~grains/m^2)) + ylab(average~airborne~pollen~(pollen~grains/m^3)) 
+  geom_segment(data = resultsxm_reg, aes(x = 10^x, y = 10^y, xend = 10^xend, yend = 10^yend, group = id), 
+               color = "gray50", alpha = 0.01) + #note, when the coord_cartesian clip is set to "off", the segments (with alpha < 1) 
+                                                 #don't appear in the graphics viewer, but do appear in the saved file
+  geom_smooth(method = "lm", se = FALSE, color = "black") + geom_point(size = 2)  +
+  scale_x_log10(labels = comma, expand = c(0, 0), limits = c(500, 150000)) + #,  
+  scale_y_log10(labels = comma, expand = c(0, 0), limits = c(100, 3000))+ 
+  annotation_logticks(outside = TRUE, long = unit(0.15, "cm")) + coord_cartesian(clip = "off") + 
+  theme(panel.grid.minor = element_blank()) +
+  xlab(pollen~production~(pollen~grains/m^2)) + ylab(average~airborne~pollen~(pollen~grains/m^3)) +
   
+  #y-axis color line
+  geom_rect(data = site_poll_rect_df, aes(xmin= xmin, xmax = xmax, ymin = ymin_v, ymax = ymax_v, fill=ymin_v), color = NA, 
+            inherit.aes = FALSE)+
+  scale_fill_gradientn( colours = c( rgb(220/255, 245/255, 233/255), rgb(34/255, 102/255, 51/255)),
+                        values = c(0, (10^c(2.25, 2.39, 3.579, 2.55, 3.323))/10^3.323), guide = FALSE) +
+
+  #x-axis color line 
+  geom_line(data = data.frame(x = c(0, c(10^(seq(log10(0 + 1), log10(150000), length.out = 99)))),
+                              y = c(rep(102,100))), aes(x= x, y= y, color=x), size=2)+
+  scale_colour_gradientn( colours = c( rgb(242/255, 241/255, 162/255), rgb(255/255, 255/255, 0), rgb(255/255, 0/255, 0/255), 
+                                       rgb(176/255, 7/255, 237/255), rgb(7/255, 29/255, 173/255)),
+                          values = c(0,(10^c(2.791, 3.579, 4.366, 5.209))/10^5.209), guide = FALSE)
+                          
+ggsave(plot = fig_1_inset, filename = "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/fig_1_inset_test_210724.png")
+
+
+
+
 # # Bootstrap 95% CI for R-Squared
 # library(boot)
 # function to obtain R-Squared from the data
@@ -359,12 +393,12 @@ p_spat_rast_focal2 <- raster::raster(p_spat_rast_focal1)
 p_spat_rast_focal3 <- raster::mask(p_spat_rast_focal2, d_wv2_boundary_utm)
 plot(p_spat_rast_focal3)
 writeRaster(p_spat_rast_focal3,  overwrite = TRUE, 
-            "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_season_210615a.tif", format="GTiff")
+            "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_season_210723.tif", format="GTiff")
 
 p_spat_rast_focal4 <- log10(p_spat_rast_focal3 + 1)
 plot(p_spat_rast_focal4)
 writeRaster(p_spat_rast_focal4,  overwrite = TRUE, 
-            "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_log10_season_210628a.tif", format="GTiff")
+            "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_log10_season_210723.tif", format="GTiff")
 
 
 
