@@ -314,8 +314,8 @@ resultsxm_reg <- as.data.frame(results$t) %>%
 
 #set the y-axis color line dataframe                        
 ymin_v <- (seq(100, 3000, length.out = 100))
-ymax_v <- c(test[2:100], 3030)
-site_poll_rect_df <- data.frame(xmin = c(rep(500, 100)), xmax = c(rep(520, 100)), 
+ymax_v <- c(ymin_v[2:100], 3030)
+site_poll_rect_df <- data.frame(xmin = c(rep(500, 100)), xmax = c(rep(570, 100)), 
                                 ymin = ymin_v, ymax = ymax_v)
 
 fig_1_inset <- bootxm %>% 
@@ -327,7 +327,8 @@ fig_1_inset <- bootxm %>%
   scale_x_log10(labels = comma, expand = c(0, 0), limits = c(500, 150000)) + #,  
   scale_y_log10(labels = comma, expand = c(0, 0), limits = c(100, 3000))+ 
   annotation_logticks(outside = TRUE, long = unit(0.15, "cm")) + coord_cartesian(clip = "off") + 
-  theme(panel.grid.minor = element_blank()) +
+  theme(panel.grid.minor = element_blank(),  panel.grid.major = element_blank(),
+        axis.title=element_text(size=8), text = element_text(size=8)) +
   xlab(pollen~production~(pollen~grains/m^2)) + ylab(average~airborne~pollen~(pollen~grains/m^3)) +
   
   #y-axis color line
@@ -338,12 +339,14 @@ fig_1_inset <- bootxm %>%
 
   #x-axis color line 
   geom_line(data = data.frame(x = c(0, c(10^(seq(log10(0 + 1), log10(150000), length.out = 99)))),
-                              y = c(rep(102,100))), aes(x= x, y= y, color=x), size=2)+
-  scale_colour_gradientn( colours = c( rgb(242/255, 241/255, 162/255), rgb(255/255, 255/255, 0), rgb(255/255, 0/255, 0/255), 
-                                       rgb(176/255, 7/255, 237/255), rgb(7/255, 29/255, 173/255)),
+                              y = c(rep(105,100))), aes(x= x, y= y, color=x), size=2.5)+
+  scale_colour_gradientn( colours = c( rgb(242/255, 252/255, 219/255), rgb(255/255, 255/255, 0), rgb(252/255, 3/255, 69/255), 
+                                       rgb(242/255, 7/255, 207/255), rgb(101/255, 0/255, 168/255)),
                           values = c(0,(10^c(2.791, 3.579, 4.366, 5.209))/10^5.209), guide = FALSE)
-                          
-ggsave(plot = fig_1_inset, filename = "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/fig_1_inset_test_210724.png")
+     
+fig_1_inset                   
+ggsave(plot = fig_1_inset, filename = "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/fig_1_inset_test_210730.png",
+       width = 3.6, height = 3.5, units = "in", dpi = 300)
 
 
 
