@@ -134,7 +134,7 @@ sum(p_Quru$predpollen) * 1000000 #convert to actual number (was originally in mi
 
 #create a blank raster with approximately 10 x 10 m pixel size
 d_rast_10m <- raster(ncol = 1453, nrow = 2116) #approximately 10 x 10 m pixel size: ncol = 1452, nrow = 2030
-extent(d_rast_10m) <- extent(tree_pred)
+extent(d_rast_10m) <- extent(p_Quru)
 d_rast_10m
 d_rast <- d_rast_10m
 
@@ -153,7 +153,8 @@ plot(p_rast)
 
 # writeRaster(p_rast, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_10m_210615.tif",
 #             format="GTiff", overwrite = TRUE)
-
+#p_rast <- raster("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_10m_210615.tif")
+  
 
 
 ### Fig 2: comparing pollen release over space with airborne pollen concentrations ######################
