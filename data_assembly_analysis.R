@@ -19,7 +19,7 @@ library(boot)
 # Airborne pollen data was collected spring of 2017, and is described in Katz et al. 2019:
 # Effect of intra-urban temperature variation on tree flowering phenology, airborne pollen, and 
 # measurement error in epidemiological studies of allergenic pollen
-p17 <- read_csv("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pollen_2017.csv") %>% 
+p17 <- read_csv("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/pollen_2017.csv") %>% 
     dplyr::select(name, long, lat, date, jday, oak_mean, oak_sd) %>% 
     mutate(dates = ymd(date),
            taxa = "p_Quercus",
@@ -28,10 +28,10 @@ p17 <- read_csv("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pollen_2017
 p17_utm <- st_as_sf(p17, coords = c("long", "lat"), crs = 4326)
 p17_utm <- st_transform(p17_utm, 32617)
 #p17_utm %>% dplyr::select(name) %>% plot(cex = 5, pch = 17)
-#write_sf(p17_utm, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pollen_2017_sf.shp")
+#write_sf(p17_utm, "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/pollen_2017_sf.shp")
 
 ##add in SCS data that are available for 2017
-scs <- read.csv("C:/Users/dsk856/Box/MIpostdoc/LakeshoreENT_pollen_counts_2009_2017_compiled.csv") %>% 
+scs <- read.csv("C:/Users/danka/Box/MIpostdoc/LakeshoreENT_pollen_counts_2009_2017_compiled.csv") %>% 
   mutate(dates = mdy(Date),
          years = year(dates),
          jday = yday(dates)) #names(scs)
@@ -47,15 +47,15 @@ scs_c <- filter(scs, years == 2017) %>%
 # Urban-scale variation in pollen concentrations: 
 # a single station is insufficient to characterize daily exposure
 
-p18 <- read_csv("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/airborne_p_2018_200228.csv")  %>% #from pollen_heterogeneity_200106.R
+p18 <- read_csv("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/airborne_p_2018_200228.csv")  %>% #from pollen_heterogeneity_200106.R
        filter(taxa2 == "Quercus") %>% 
        mutate(dates = ymd(date))
 p18_utm <- st_as_sf(p18, coords = c("long", "lat"), crs = 4326) 
 p18_utm <- st_transform(p18_utm, 32617) #set as UTM 17
-#write_sf(p18_utm, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pollen_2018_sf.shp")
+#write_sf(p18_utm, "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/pollen_2018_sf.shp")
 
 #load in a shapefile that has Detroit's boundary clipped to the middle tile of WV2 imagery (i.e., the area of tree ID project)
-d_wv2_boundary <- read_sf("C:/Users/dsk856/Box/MIpostdoc/Detroit spatial data/Detroit boundary/Detroit_wv2_middle_boundary_v2.shp")
+d_wv2_boundary <- read_sf("C:/Users/danka/Box/MIpostdoc/Detroit spatial data/Detroit boundary/Detroit_wv2_middle_boundary_v2.shp")
 d_wv2_boundary_utm <- st_transform(d_wv2_boundary, 32617)
 
 #only include observations from sites within the AOI
@@ -108,11 +108,11 @@ p18_peak_season <-
   p18_utm_inAOI_NAs %>% 
   filter(date > ymd("2018-05-05") & date < ymd("2018-05-22")) %>% 
   group_by(site) %>% 
-  summarize(oak_mean = mean(pollen_interp)) %>% 
-  mutate(m_l10 = log10(oak_mean))   
+  summarize(oak_season_mean = mean(pollen_interp)) %>% 
+  mutate(m_l10 = log10(oak_season_mean))   
 
 p18_peak_season
-#write_sf(p18_peak_season, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pollen_peak_mean_2018_sfb.shp", overwrite= TRUE)
+#write_sf(p18_peak_season, "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/pollen_peak_mean_2018_sfb.shp", overwrite= TRUE)
 #15* 5 - 3
 
 ### data assembly: tree location and pollen production map ##############################################
@@ -120,17 +120,18 @@ p18_peak_season
 # Improved Classification of Urban Trees Using a Widespread Multi-Temporal Aerial Image Dataset
 # original shapefile: 
 
-#tree_pred <- st_read("C:/Users/dsk856/Box/MIpostdoc/trees/tree_identificaiton/predictions/pred190715.shp")
+#tree_pred <- st_read("C:/Users/danka/Box/MIpostdoc/trees/tree_identificaiton/predictions/pred190715.shp")
 #p_Quru <- filter(tree_pred, prdctd_ == "Quercus") %>%  dplyr::select(area)
 
 # Pollen production is described in Katz et al. 2020:
 # Pollen production for 13 urban North American tree species: allometric equations for tree trunk diameter and crown area
 
 #p_Quru$predpollen <- p_Quru$area * 0.97 + 17.02 #using equation for red oak
-#write_sf(p_Quru, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pred_qusp_pol_prod210723.shp")
-p_Quru <- read_sf("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/pred_qusp_pol_prod210723.shp")
-sum(p_Quru$predpollen) * 1000000 #convert to actual number (was originally in millions)
-
+#write_sf(p_Quru, "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/pred_qusp_pol_prod210723.shp")
+p_Quru <- read_sf("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/pred_qusp_pol_prod210723.shp")
+sum(p_Quru$predpollen) * 1000000000 #convert to actual number (was originally in billions, NOT MILLIONS)
+#mean(p_Quru$predpollen) * 1000000000 * 29287 #yes, this seems like a reasonable amount
+#mean(p_Quru$area) #yes, this seems like a reasonable amount
 
 #create a blank raster with approximately 10 x 10 m pixel size
 d_rast_10m <- raster(ncol = 1453, nrow = 2116) #approximately 10 x 10 m pixel size: ncol = 1452, nrow = 2030
@@ -141,7 +142,7 @@ d_rast <- d_rast_10m
 trees_as_points <- p_Quru %>% st_cast("POINT", do_split = FALSE)
 p_rast <- rasterize(trees_as_points, d_rast, field = "predpollen", fun = sum, na.rm = TRUE)
 pixel_area <- (res(p_rast)[1] * res(p_rast)[2]) #get pixel area in m2
-p_rast <- (p_rast/ pixel_area) * 1000000 #convert to pol/m2 (was originally in millions)
+p_rast <- (p_rast/ pixel_area) * 1000000000 #convert to pol/m2 (was originally in billions NOT millions)
 p_rast[p_rast < 0] <- 0 #make sure that none of the trees have values below 0
 p_rast[is.na(p_rast)] <- 0 #set cells with no oak tree (but within extent of tree map) to zero
 crs(p_rast) <- CRS('+init=EPSG:32617') # plot(p_rast) # projection(p_rast)
@@ -151,9 +152,9 @@ p_rast <- raster::mask(x = p_rast, mask = d_wv2_boundary_utm)
 plot(p_rast)
 # plot(st_geometry(d_wv2_boundary_utm), add = TRUE) #this was loaded earlier in script
 
-# writeRaster(p_rast, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_10m_210615.tif",
+# writeRaster(p_rast, "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_10m_220118.tif",
 #             format="GTiff", overwrite = TRUE)
-#p_rast <- raster("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_10m_210615.tif")
+#p_rast <- raster("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_10m_220118.tif")
   
 
 
@@ -316,7 +317,7 @@ resultsxm_reg <- as.data.frame(results$t) %>%
 #set the y-axis color line dataframe                        
 ymin_v <- (seq(100, 3000, length.out = 100))
 ymax_v <- c(ymin_v[2:100], 3030)
-site_poll_rect_df <- data.frame(xmin = c(rep(500, 100)), xmax = c(rep(570, 100)), 
+site_poll_rect_df <- data.frame(xmin = c(rep(500000, 100)), xmax = c(rep(570000, 100)), #xmin and xmax change x coord of color bar
                                 ymin = ymin_v, ymax = ymax_v)
 
 fig_1_inset <- bootxm %>% 
@@ -325,7 +326,7 @@ fig_1_inset <- bootxm %>%
                color = "gray50", alpha = 0.01) + #note, when the coord_cartesian clip is set to "off", the segments (with alpha < 1) 
                                                  #don't appear in the graphics viewer, but do appear in the saved file
   geom_smooth(method = "lm", se = FALSE, color = "black") + geom_point(size = 2)  +
-  scale_x_log10(labels = comma, expand = c(0, 0), limits = c(500, 150000)) + #,  
+  scale_x_log10(labels = comma, expand = c(0, 0), limits = c(500000, 150000000)) + #changes scale of x axis  
   scale_y_log10(labels = comma, expand = c(0, 0), limits = c(100, 3000))+ 
   annotation_logticks(outside = TRUE, long = unit(0.15, "cm")) + coord_cartesian(clip = "off") + 
   theme(panel.grid.minor = element_blank(),  panel.grid.major = element_blank(),
@@ -339,14 +340,14 @@ fig_1_inset <- bootxm %>%
                         values = c(0, (10^c(2.25, 2.39, 3.579, 2.55, 3.323))/10^3.323), guide = FALSE) +
 
   #x-axis color line 
-  geom_line(data = data.frame(x = c(0, c(10^(seq(log10(0 + 1), log10(150000), length.out = 99)))),
+  geom_line(data = data.frame(x = c(0, c(10^(seq(log10(1000 + 1), log10(150000000), length.out = 99)))), #changes location of x color bar
                               y = c(rep(105,100))), aes(x= x, y= y, color=x), size=2.5)+
   scale_colour_gradientn( colours = c( rgb(242/255, 252/255, 219/255), rgb(255/255, 255/255, 0), rgb(252/255, 3/255, 69/255), 
                                        rgb(242/255, 7/255, 207/255), rgb(101/255, 0/255, 168/255)),
-                          values = c(0,(10^c(2.791, 3.579, 4.366, 5.209))/10^5.209), guide = FALSE)
+                          values = c(0,(10^c(5.791, 6.579, 7.366, 8.209))/10^8.209), guide = FALSE)
      
 fig_1_inset                   
-ggsave(plot = fig_1_inset, filename = "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/fig_1_inset_test_210730.png",
+ggsave(plot = fig_1_inset, filename = "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/fig_1_inset_test_220118.png",
        width = 3.6, height = 3.5, units = "in", dpi = 300)
 
 
@@ -397,12 +398,12 @@ p_spat_rast_focal2 <- raster::raster(p_spat_rast_focal1)
 p_spat_rast_focal3 <- raster::mask(p_spat_rast_focal2, d_wv2_boundary_utm)
 plot(p_spat_rast_focal3)
 writeRaster(p_spat_rast_focal3,  overwrite = TRUE, 
-            "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_season_210723.tif", format="GTiff")
+            "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_season_210723.tif", format="GTiff")
 
 p_spat_rast_focal4 <- log10(p_spat_rast_focal3 + 1)
 plot(p_spat_rast_focal4)
 writeRaster(p_spat_rast_focal4,  overwrite = TRUE, 
-            "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_log10_season_210723.tif", format="GTiff")
+            "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_log10_season_210723.tif", format="GTiff")
 
 
 
@@ -496,7 +497,7 @@ writeRaster(p_spat_rast_focal4,  overwrite = TRUE,
 # # example_raster3 <- raster::mask(x = example_raster2, mask = d_wv2_boundary_utm)
 # # plot(example_raster3)
 # # 
-# # writeRaster(example_raster3, "C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/qusp_Fsiland_210528.tif")
+# # writeRaster(example_raster3, "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/qusp_Fsiland_210528.tif")
 # 
 # #str(resF2)
 # p18_total_season2 %>% 
@@ -539,7 +540,7 @@ p_rast_AOI
 
 #create rasters of percent active flowers for oaks on each day in 2017
 #this raster was projected to UTM 17N and cell size was adjusted to match the pollen production surface in GIS
-d_peak <- raster("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/peakflowering_d_UTM17c.tif") 
+d_peak <- raster("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/peakflowering_d_UTM17c.tif") 
 d_peak <- raster::resample(d_peak, p_rast) #plot(p_rast)
 d_peak <- crop(d_peak, p_rast) #plot(d_peak)
 
@@ -555,7 +556,7 @@ d_peak <- d_peak + 3 # 3 > 2 > 4> 5 > 0
 
 #I created an empirical look-up table of the average percent of mature flowers on days away from peak
 #load in lookup table
-pflow_lookup_summary <- read.csv("C:/Users/dsk856/Box/MIpostdoc/trees/Phenology and daily variation in pollen release/pflow_lookup_summary.csv") 
+pflow_lookup_summary <- read.csv("C:/Users/danka/Box/MIpostdoc/trees/Phenology and daily variation in pollen release/pflow_lookup_summary.csv") 
 #apply this function to create a raster for each day with the percent flowering
 #the proportion of all active flowers that were going on that day
 pflow_lookup_summary$prop_pollen <- pflow_lookup_summary$mean_flow/sum(pflow_lookup_summary$mean_flow) #changing season total to 1
@@ -681,7 +682,7 @@ summary(fit)
 
 ### create animation of pollen release within selected distance for each day ###########################
 library(terra)
-setwd("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/animation_release_per_day2.2km/")
+setwd("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/animation_release_per_day2.2km/")
 focal_distance_selected <- 2200 #based on distance selection table (above)
 
 #plot(p_per_day_stack2[[10]])
@@ -749,7 +750,7 @@ list.files(path = ".", pattern = "*.png", full.names = T) %>%
 
 ## compare SCS estimate with my pollen prod estimate for each obs -----------------------------
 ##add in SCS data that are available for 2017
-scs <- read.csv("C:/Users/dsk856/Box/MIpostdoc/LakeshoreENT_pollen_counts_2009_2017_compiled.csv") %>% 
+scs <- read.csv("C:/Users/danka/Box/MIpostdoc/LakeshoreENT_pollen_counts_2009_2017_compiled.csv") %>% 
   mutate(date = mdy(Date),
        year = year(date),
        jday = yday(date)) %>% 
@@ -777,7 +778,7 @@ ggplot(p17_utm3, aes(x = date, y = oak_mean + 1, group = name)) + geom_point() +
 
 
 # ## compare Sylvania/Toledo estimate with my pollen prod estimate for each obs ?
-# tol <- read.csv("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/NAB_sylvania_Toledo_data.csv") %>% 
+# tol <- read.csv("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/NAB_sylvania_Toledo_data.csv") %>% 
 #   mutate(date = mdy(Date),
 #          year = year(date),
 #          jday = yday(date),
@@ -821,12 +822,12 @@ ggplot(p17_utm3, aes(x = date, y = oak_mean + 1, group = name)) + geom_point() +
 # 
 # #create rasters of percent active flowers for oaks in 2017
 # #this raster was projected to UTM 17N and cell size was adjusted to match the pollen production surface in GIS
-# d_peak <- raster("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/peakflowering_d_UTM17c.tif") 
+# d_peak <- raster("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/peakflowering_d_UTM17c.tif") 
 # d_peak <- raster::resample(d_peak, p_rast)
 # d_peak <- crop(d_peak, p_rast)
 # #plot(d_peak)
 # 
-# # peakflow_oak_d <- raster("C:/Users/dsk856/Box/MIpostdoc/trees/Phenology and daily variation in pollen release/peakflowering_d_UTM17.tif") #plot(peakflow_oak_d)
+# # peakflow_oak_d <- raster("C:/Users/danka/Box/MIpostdoc/trees/Phenology and daily variation in pollen release/peakflowering_d_UTM17.tif") #plot(peakflow_oak_d)
 # # d <- extent(-83.3, -82.86, 42.30, 42.6)
 # # d_peak <- crop(peakflow_oak_d, d)
 # # plot(peakflow_oak_d)
@@ -841,7 +842,7 @@ ggplot(p17_utm3, aes(x = date, y = oak_mean + 1, group = name)) + geom_point() +
 # 
 # #I created an empirical look-up table of the average percent of mature flowers on days away from peak
 # #load in lookup table
-# pflow_lookup_summary <- read_csv("C:/Users/dsk856/Box/MIpostdoc/trees/Phenology and daily variation in pollen release/pflow_lookup_summary.csv") %>% 
+# pflow_lookup_summary <- read_csv("C:/Users/danka/Box/MIpostdoc/trees/Phenology and daily variation in pollen release/pflow_lookup_summary.csv") %>% 
 #   mutate(days_from_site_mean_low = days_from_site_mean - 0.5,
 #          days_from_site_mean_hi = days_from_site_mean + 0.5)
 # #apply this function to create a raster for each day with the percent flowering
@@ -876,13 +877,13 @@ ggplot(p17_utm3, aes(x = date, y = oak_mean + 1, group = name)) + geom_point() +
 # #p_per_day_stack[p_per_day_stack[] == 0] <- NA #trying this so I can get white cells when no pollen prod
 # 
 # # library(rgdal)
-# # setwd("C:/Users/dsk856/Box/MIpostdoc/trees/Phenology and daily variation in pollen release/detroit cartography/detroit_water")
+# # setwd("C:/Users/danka/Box/MIpostdoc/trees/Phenology and daily variation in pollen release/detroit cartography/detroit_water")
 # # d_water <-readOGR(".", layer="detroit_water1")
 # # d_water_utm <- st_as_sf(d_water)
 # # d_water_utm <- st_transform(d_water_utm, crs(d_peak))
 # # d_water_utm <-sf:::as_Spatial(d_water_utm)
 # # 
-# # d_bound <- read_sf("C:/Users/dsk856/Box/MIpostdoc/Detroit spatial data/Detroit boundary/Detroit_wv2_middle_boundary_v2.shp")
+# # d_bound <- read_sf("C:/Users/danka/Box/MIpostdoc/Detroit spatial data/Detroit boundary/Detroit_wv2_middle_boundary_v2.shp")
 # # d_bound_utm <- st_transform(d_bound, crs(d_peak))
 # 
 # 
@@ -916,7 +917,7 @@ ggplot(p17_utm3, aes(x = date, y = oak_mean + 1, group = name)) + geom_point() +
 # # 
 # # #ANIMATE
 # # #saving a png file for each graph
-# # setwd("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/animation")
+# # setwd("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/animation")
 # # p_per_day_stack
 # # #month and day as.Date((109 + 1), origin = "2016-12-31")
 # # for(i in 1:36){ #1:36
@@ -960,7 +961,7 @@ ggplot(p17_utm3, aes(x = date, y = oak_mean + 1, group = name)) + geom_point() +
 # # 
 # # 
 # # #month and day as.Date((109 + 1), origin = "2016-12-31")
-# # setwd("C:/Users/dsk856/Box/MIpostdoc/trees/airborne_pollen/animation_prod__per_day_within1km")
+# # setwd("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/animation_prod__per_day_within1km")
 # # 
 # # my.at=c(0, 100, 500, 1000, 2500, 5000, 7500, 10000, 15000, 20000, 30000,40000, 60000)
 # # my.brks=seq(0, 100, by=10)
