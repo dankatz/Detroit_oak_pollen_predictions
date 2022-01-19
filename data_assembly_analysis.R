@@ -120,22 +120,23 @@ p18_peak_season
 # Improved Classification of Urban Trees Using a Widespread Multi-Temporal Aerial Image Dataset
 # original shapefile: 
 
-#tree_pred <- st_read("C:/Users/danka/Box/MIpostdoc/trees/tree_identificaiton/predictions/pred190715.shp")
+tree_pred <- st_read("C:/Users/danka/Box/MIpostdoc/trees/tree_identificaiton/predictions/pred190715.shp")
 #p_Quru <- filter(tree_pred, prdctd_ == "Quercus") %>%  dplyr::select(area)
 
 # Pollen production is described in Katz et al. 2020:
 # Pollen production for 13 urban North American tree species: allometric equations for tree trunk diameter and crown area
 
-#p_Quru$predpollen <- p_Quru$area * 0.97 + 17.02 #using equation for red oak
+#p_Quru$predpollen <- p_Quru$area * 0.97 + 17.02 #using equation for red oak #(50 * 0.97 + 17)/50 #.16/1.3
 #write_sf(p_Quru, "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/pred_qusp_pol_prod210723.shp")
-p_Quru <- read_sf("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/pred_qusp_pol_prod210723.shp")
+p_Quru <- read_sf("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/pred_qusp_pol_prod210723.shp") #plot(p_Quru)
 sum(p_Quru$predpollen) * 1000000000 #convert to actual number (was originally in billions, NOT MILLIONS)
+#2.29 quadrillion
 #mean(p_Quru$predpollen) * 1000000000 * 29287 #yes, this seems like a reasonable amount
 #mean(p_Quru$area) #yes, this seems like a reasonable amount
 
 #create a blank raster with approximately 10 x 10 m pixel size
 d_rast_10m <- raster(ncol = 1453, nrow = 2116) #approximately 10 x 10 m pixel size: ncol = 1452, nrow = 2030
-extent(d_rast_10m) <- extent(p_Quru)
+extent(d_rast_10m) <- extent(tree_pred) #plot(p_Quru$predpollen) extent(p_Quru)
 d_rast_10m
 d_rast <- d_rast_10m
 
@@ -347,7 +348,7 @@ fig_1_inset <- bootxm %>%
                           values = c(0,(10^c(5.791, 6.579, 7.366, 8.209))/10^8.209), guide = FALSE)
      
 fig_1_inset                   
-ggsave(plot = fig_1_inset, filename = "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/fig_1_inset_test_220118.png",
+ggsave(plot = fig_1_inset, filename = "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/fig_2b_prod_vs_airborne_220118.png",
        width = 3.6, height = 3.5, units = "in", dpi = 300)
 
 
@@ -398,13 +399,13 @@ p_spat_rast_focal2 <- raster::raster(p_spat_rast_focal1)
 p_spat_rast_focal3 <- raster::mask(p_spat_rast_focal2, d_wv2_boundary_utm)
 plot(p_spat_rast_focal3)
 writeRaster(p_spat_rast_focal3,  overwrite = TRUE, 
-            "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_season_210723.tif", format="GTiff")
+            "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_season_220118.tif", format="GTiff")
+#max(p_spat_rast_focal3)
 
 p_spat_rast_focal4 <- log10(p_spat_rast_focal3 + 1)
 plot(p_spat_rast_focal4)
 writeRaster(p_spat_rast_focal4,  overwrite = TRUE, 
-            "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_log10_season_210723.tif", format="GTiff")
-
+            "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_log10_season_220118b.tif", format="GTiff")
 
 
 
@@ -648,7 +649,7 @@ round(results_df_log10, 3)
 
 
 ## creating fig 3A using the distance selected above ---------------------------------------------------
-focal_distance_selected <- 2200
+focal_distance_selected <- 1100
 
 p17_utm3 <- st_join(p17_utm, d_wv2_boundary_utm) %>% 
   filter(is_D == "d") %>% 
@@ -666,11 +667,15 @@ for(j in 1:nrow(p17_utm3)){
 } 
 
 #airborne pollen in 2017 vs pollen production on that day and location in 2017
-ggplot(p17_utm3, aes(x = p_prod_day_xm +1, y = oak_mean + 1)) + geom_point(alpha = 0.5) + theme_bw() + 
+ggplot(p17_utm3, aes(x = p_prod_day_xm +1, y = oak_mean + 1)) + geom_point(alpha = 0.7) + theme_bw() + 
   geom_smooth(method = "lm", se = FALSE) + ylab(airborne~oak~pollen~(grains~per~m^3)) + 
   xlab(oak~pollen~released~daily~(grains/m^2)) +
   scale_x_log10(labels = comma) + scale_y_log10() + annotation_logticks() +
-  theme(panel.grid.minor = element_blank())
+  theme(panel.grid.minor = element_blank(), plot.margin = margin(0, 20, 0, -5), text = element_text(size=8),
+        axis.title.y = element_text(vjust=-3.5))
+
+ggsave(filename = "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/fig_3d_prod_vs_airborne_220119.png",
+       width = 3.6, height = 3.5, units = "in", dpi = 500)
 
 # fit <- lm(p17_utm3$oak_mean  ~ p17_utm3$p_prod_day_xm)
 # summary(fit)
@@ -678,12 +683,17 @@ ggplot(p17_utm3, aes(x = p_prod_day_xm +1, y = oak_mean + 1)) + geom_point(alpha
 fit <- lm(log10(p17_utm3$oak_mean + 1) ~ log10(p17_utm3$p_prod_day_xm + 1))
 summary(fit)
 
+#what if zero values are left out?
+p17_utm3_nozeros <- p17_utm3 %>% filter(p_prod_day_xm > 10) 
+fit <- lm(log10(p17_utm3_nozeros$oak_mean + 1) ~ log10(p17_utm3_nozeros$p_prod_day_xm + 1))
+summary(fit)
 
 
 ### create animation of pollen release within selected distance for each day ###########################
 library(terra)
-setwd("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/animation_release_per_day2.2km/")
-focal_distance_selected <- 2200 #based on distance selection table (above)
+library(tmap)
+setwd("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/animation_release_perday1.2km/")
+focal_distance_selected <- 1100 #based on distance selection table (above)
 
 #plot(p_per_day_stack2[[10]])
 p_per_day_spat_rast <- terra::rast(p_per_day_stack2) #convert to terra format #plot(p_rast) #plot(p_spat_rast)
@@ -717,9 +727,9 @@ print(
   tm_raster(title = "grains/m\u00b2/day",  #have to use unicode to sneak in the superscript
             legend.reverse = TRUE,
             #legend.is.portrait = FALSE,
-            breaks = c(1,5,10, 50,100,500, 1000,5000,10000,50000),
+            breaks = c(1, 10, 100, 1000, 10000, 100000, 1000000,10000000,100000000),
             style = "cont", #style = "log10",
-            labels = c("1","5","10","50","100","500","1,000","5,000","10,000","50,000"),
+            labels = c("1","10","100","1000","1,000","10,000","100,000","1,000,000","10,000,000"),
             palette = "-viridis")+
   tm_legend(outside = TRUE, legend.text.size = 1.0) + 
   tm_compass() +
