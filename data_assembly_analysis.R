@@ -155,7 +155,7 @@ plot(p_rast)
 
 # writeRaster(p_rast, "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_10m_220118.tif",
 #             format="GTiff", overwrite = TRUE)
-#p_rast <- raster("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_10m_220118.tif")
+# p_rast <- raster("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_10m_220118.tif")
   
 
 
@@ -348,8 +348,8 @@ fig_1_inset <- bootxm %>%
                           values = c(0,(10^c(5.791, 6.579, 7.366, 8.209))/10^8.209), guide = FALSE)
      
 fig_1_inset                   
-ggsave(plot = fig_1_inset, filename = "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/fig_2b_prod_vs_airborne_220118.png",
-       width = 3.6, height = 3.5, units = "in", dpi = 300)
+# ggsave(plot = fig_1_inset, filename = "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/fig_2b_prod_vs_airborne_220118.png",
+#        width = 3.6, height = 3.5, units = "in", dpi = 300)
 
 
 
@@ -398,14 +398,14 @@ p_spat_rast_focal1 <- terra::focal(x= p_spat_rast, w = fwModel, fun = "mean", na
 p_spat_rast_focal2 <- raster::raster(p_spat_rast_focal1)
 p_spat_rast_focal3 <- raster::mask(p_spat_rast_focal2, d_wv2_boundary_utm)
 plot(p_spat_rast_focal3)
-writeRaster(p_spat_rast_focal3,  overwrite = TRUE, 
-            "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_season_220118.tif", format="GTiff")
+# writeRaster(p_spat_rast_focal3,  overwrite = TRUE, 
+#             "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_season_220118.tif", format="GTiff")
 #max(p_spat_rast_focal3)
 
 p_spat_rast_focal4 <- log10(p_spat_rast_focal3 + 1)
 plot(p_spat_rast_focal4)
-writeRaster(p_spat_rast_focal4,  overwrite = TRUE, 
-            "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_log10_season_220118b.tif", format="GTiff")
+# writeRaster(p_spat_rast_focal4,  overwrite = TRUE, 
+#             "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/p_prod_quru_log10_season_220118b.tif", format="GTiff")
 
 
 
@@ -547,8 +547,9 @@ d_peak <- crop(d_peak, p_rast) #plot(d_peak)
 
 
 #Add a lag to the flowering intensity model to account for differences between street trees and non-street trees
+# removing this because a reviewer considered having it "daredevil"
 #note: another potential option would be to use the Landsat LST, see: https://www.mdpi.com/2072-4292/12/9/1471/htm
-d_peak <- d_peak + 3 # 3 > 2 > 4> 5 > 0 
+# d_peak <- d_peak + 3 # 3 > 2 > 4> 5 > 0 
 #d_peak[d_peak[] == -996] <- NA
 
 
@@ -570,7 +571,7 @@ pflow_lookup_summary$days_from_site_mean_hi <-  pflow_lookup_summary$days_from_s
 
 #creating a stack that has percent flowering on each day
 flower_stack <- stack()
-for(i in 110:145){
+for(i in 105:145){
   focal_day <- i
   days_from_peak <- focal_day - d_peak 
   flowering_on_day_x <- reclassify(days_from_peak, pflow_lookup_summary2)
@@ -607,8 +608,8 @@ for(i in 1:length(distance_loop)){
     date_obs <- p17_utm2$jday[j]
     p17_utm_focal_obs <- p17_utm2[j,] #    p17_utm_focal_obs <- p17_utm2[1,]
     
-    #pol_prod_day_1km_m has 36 layers for sequential days. layer 1 == jday 110, layer 2 == jday 111, ...
-    relevant_layer <- p17_utm_focal_obs$jday - 109  #select the right layer #relevant_layer <- 115 - 109
+    #pol_prod_day_1km_m has 36 layers for sequential days. layer 1 == jday 107, layer 2 == jday 108, ...
+    relevant_layer <- p17_utm_focal_obs$jday - 104  #select the right layer #relevant_layer <- 115 - 109
     p17_utm2$p_prod_day_xm[j] <- raster::extract(p_per_day_stack2[[relevant_layer]], p17_utm_focal_obs,
                                                  fun = mean, buffer = focal_distance, na.rm = TRUE)  
   } 
@@ -649,7 +650,7 @@ round(results_df_log10, 3)
 
 
 ## creating fig 3A using the distance selected above ---------------------------------------------------
-focal_distance_selected <- 1100
+focal_distance_selected <- 1900
 
 p17_utm3 <- st_join(p17_utm, d_wv2_boundary_utm) %>% 
   filter(is_D == "d") %>% 
@@ -661,7 +662,7 @@ for(j in 1:nrow(p17_utm3)){
   p17_utm_focal_obs <- p17_utm3[j,] #    p17_utm_focal_obs <- p17_utm3[1,]
   
   #pol_prod_day_1km_m has 36 layers for sequential days. layer 1 == jday 110, layer 2 == jday 111, ...
-  relevant_layer <- p17_utm_focal_obs$jday - 109  #select the right layer #relevant_layer <- 115 - 109
+  relevant_layer <- p17_utm_focal_obs$jday - 104  #select the right layer #relevant_layer <- 115 - 109
   p17_utm3$p_prod_day_xm[j] <- raster::extract(p_per_day_stack2[[relevant_layer]], p17_utm_focal_obs,
                                                fun = mean, buffer = focal_distance_selected, na.rm = TRUE)  
 } 
@@ -674,7 +675,7 @@ ggplot(p17_utm3, aes(x = p_prod_day_xm +1, y = oak_mean + 1)) + geom_point(alpha
   theme(panel.grid.minor = element_blank(), plot.margin = margin(0, 20, 0, -5), text = element_text(size=8),
         axis.title.y = element_text(vjust=-3.5))
 
-ggsave(filename = "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/fig_3d_prod_vs_airborne_220119.png",
+ggsave(filename = "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/fig_3d_prod_vs_airborne_220721.png",
        width = 3.6, height = 3.5, units = "in", dpi = 500)
 
 # fit <- lm(p17_utm3$oak_mean  ~ p17_utm3$p_prod_day_xm)
@@ -683,17 +684,17 @@ ggsave(filename = "C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/fig_3d_pro
 fit <- lm(log10(p17_utm3$oak_mean + 1) ~ log10(p17_utm3$p_prod_day_xm + 1))
 summary(fit)
 
-#what if zero values are left out?
-p17_utm3_nozeros <- p17_utm3 %>% filter(p_prod_day_xm > 10) 
-fit <- lm(log10(p17_utm3_nozeros$oak_mean + 1) ~ log10(p17_utm3_nozeros$p_prod_day_xm + 1))
-summary(fit)
+# #what if zero values are left out?
+# p17_utm3_nozeros <- p17_utm3 %>% filter(p_prod_day_xm > 10)
+# fit <- lm(log10(p17_utm3_nozeros$oak_mean + 1) ~ log10(p17_utm3_nozeros$p_prod_day_xm + 1))
+# summary(fit)
 
 
 ### create animation of pollen release within selected distance for each day ###########################
 library(terra)
 library(tmap)
 setwd("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/animation_release_perday1.2km/")
-focal_distance_selected <- 1100 #based on distance selection table (above)
+focal_distance_selected <- 1900 #based on distance selection table (above)
 
 #plot(p_per_day_stack2[[10]])
 p_per_day_spat_rast <- terra::rast(p_per_day_stack2) #convert to terra format #plot(p_rast) #plot(p_spat_rast)
@@ -707,12 +708,12 @@ fwModel[fwModel == 0] <- NA
 
 
 #create each still image
-for(i in 1:36){
+for(i in 1:41){
 focal_day_raster <- i #focal_day_raster <- 20
 #note that the focal function in terra only works one layer at a time at the moment
 p_per_day_spat_rast2_focal1 <- terra::focal(x= p_per_day_spat_rast2[[focal_day_raster]], 
                                             w = fwModel, fun = "mean", na.rm = TRUE) #takes 2 min at r = 70 cells
-#plot(p_spat_rast_focal1); plot(d_wv2_boundary_utm, add = TRUE, color = NA)
+#plot(p_per_day_spat_rast2[[]]); plot(d_wv2_boundary_utm, add = TRUE, color = NA)
 p_per_day_spat_rast2_focal2 <- raster::raster(p_per_day_spat_rast2_focal1)
 p_per_day_spat_rast2_focal3 <- raster::mask(p_per_day_spat_rast2_focal2, d_wv2_boundary_utm)
 
@@ -746,13 +747,14 @@ dev.off()
 } #end day loop
 
 
+
 #creating an animation
 library(magick)
 list.files(path = ".", pattern = "*.png", full.names = T) %>%
   purrr::map(image_read) %>% # reads each path file
   image_join() %>% # joins image
   image_animate(fps=1) %>% # animates, can opt for number of loops
-  image_write("oak_pollen_prod_in_Detroit_v2.gif") # write to current dir
+  image_write("oak_pollen_prod_in_Detroit_v3.gif") # write to current dir
 
 
 
@@ -777,12 +779,18 @@ fit <- lm(log10(p17_utm4$oak_mean + 1) ~ log10(p17_utm4$scs_oak + 1))
 summary(fit)
 
 #direct comparison
-ggplot(p17_utm4, aes(x = scs_oak + 1, y = oak_mean + 1)) + geom_point() + theme_bw() + geom_smooth(method = "lm", se = FALSE) +
-  scale_x_log10() + scale_y_log10()
+ggplot(p17_utm4, aes(x = scs_oak + 1, y = oak_mean + 1)) + #geom_point() + theme_bw() + geom_smooth(method = "lm", se = FALSE) +
+  scale_x_log10() + scale_y_log10() + geom_point(alpha = 0.7) + theme_bw() + 
+  geom_smooth(method = "lm", se = FALSE) + ylab(airborne~oak~pollen~measured~at~Detroit~sites~(grains~per~m^3)) + 
+  xlab(airborne~oak~pollen~measured~at~SCS~(grains~per~m^3)) +
+  scale_x_log10(labels = comma) + scale_y_log10() + annotation_logticks() +
+  theme(panel.grid.minor = element_blank(), plot.margin = margin(0, 20, 0, -5), text = element_text(size=8),
+        axis.title.y = element_text(vjust=-3.5))
 
 #time series
 ggplot(p17_utm3, aes(x = date, y = oak_mean + 1, group = name)) + geom_point() + theme_bw() + geom_line() +
-  geom_line(data = scs, aes(x= date, y = scs_oak + 1, group = "test"), color = "red") + scale_y_log10()
+  geom_line(data = scs, aes(x= date, y = scs_oak + 1, group = "test"), color = "red") + scale_y_log10() +
+  xlab()
 
 
 
@@ -822,184 +830,3 @@ ggplot(p17_utm3, aes(x = date, y = oak_mean + 1, group = name)) + geom_point() +
 #   scale_x_date(lim = c(ymd("2018-04-05"), ymd("2018-06-01")))
 
 
-### old stuff ##########################################################################
-
-### data assembly: phenology model data #################################################################
-# # oak phenology data was collected spring of 2017, and is described in Katz et al. 2019:
-# # Effect of intra-urban temperature variation on tree flowering phenology, airborne pollen, and 
-# # measurement error in epidemiological studies of allergenic pollen
-# # see: PHENO_ANALYSES_FIGS_V4_181025.R
-# 
-# #create rasters of percent active flowers for oaks in 2017
-# #this raster was projected to UTM 17N and cell size was adjusted to match the pollen production surface in GIS
-# d_peak <- raster("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/peakflowering_d_UTM17c.tif") 
-# d_peak <- raster::resample(d_peak, p_rast)
-# d_peak <- crop(d_peak, p_rast)
-# #plot(d_peak)
-# 
-# # peakflow_oak_d <- raster("C:/Users/danka/Box/MIpostdoc/trees/Phenology and daily variation in pollen release/peakflowering_d_UTM17.tif") #plot(peakflow_oak_d)
-# # d <- extent(-83.3, -82.86, 42.30, 42.6)
-# # d_peak <- crop(peakflow_oak_d, d)
-# # plot(peakflow_oak_d)
-# 
-# #Add a lag to the flowering intensity model to account for differences between street trees and non-street trees
-# d_peak <- d_peak + 3 
-# d_peak[d_peak[] == -996] <- NA
-# 
-# ##FOR ANIMATION SWAP THIS IN- IT GETS RID OF WHITE PIXELS: d_peak <- crop(peakflow_oak_d, d); plot(d_peak)
-# #d_peak_big <- aggregate(d_peak, 10, fun = mean, na.rm = TRUE) #plot(d_peak_big) #plot(peakflow_oak_d_water999)
-# #vmap$peak_oak <- raster::extract(x = peakflow_oak_d, y = cbind(vmap$long, vmap$lat), buffer = 500, fun = mean, na.rm = TRUE)
-# 
-# #I created an empirical look-up table of the average percent of mature flowers on days away from peak
-# #load in lookup table
-# pflow_lookup_summary <- read_csv("C:/Users/danka/Box/MIpostdoc/trees/Phenology and daily variation in pollen release/pflow_lookup_summary.csv") %>% 
-#   mutate(days_from_site_mean_low = days_from_site_mean - 0.5,
-#          days_from_site_mean_hi = days_from_site_mean + 0.5)
-# #apply this function to create a raster for each day with the percent flowering
-# pflow_lookup_summary2 <- cbind(pflow_lookup_summary$days_from_site_mean_low, pflow_lookup_summary$days_from_site_mean_hi,
-#                                pflow_lookup_summary$mean_flow)
-# 
-# #creating a stack that has percent flowering on each day
-# flower_stack <- stack()
-# for(i in 110:145){
-#   focal_day <- i
-#   test2 <- focal_day - d_peak 
-#   test3 <- reclassify(test2, pflow_lookup_summary2)
-#   names(test3) <- paste("flow_", focal_day, sep = "")
-#   plot(test3, main = focal_day)
-#   flower_stack <- stack(flower_stack, test3)
-# }
-#
-# ### predictions of pollen release over space and time ###################################################
-# plot(p_rast)
-# flower_stack <- flower_stack * 0.01 #Changing percentage to proportion
-# 
-# # for(i in 1:20){plot(flower_stack[[i]])}
-# # plot(flower_stack[[20]])
-# p_per_day_stack <- p_rast * flower_stack
-# 
-# 
-# 
-# # plot(flower_stack[[1]])
-# # plot(p_per_day_stack[[2]])
-# # for(i in 1:36){plot(p_per_day_stack[[i]])}
-# #p_per_day_stack_test <- p_per_day_stack
-# #p_per_day_stack[p_per_day_stack[] == 0] <- NA #trying this so I can get white cells when no pollen prod
-# 
-# # library(rgdal)
-# # setwd("C:/Users/danka/Box/MIpostdoc/trees/Phenology and daily variation in pollen release/detroit cartography/detroit_water")
-# # d_water <-readOGR(".", layer="detroit_water1")
-# # d_water_utm <- st_as_sf(d_water)
-# # d_water_utm <- st_transform(d_water_utm, crs(d_peak))
-# # d_water_utm <-sf:::as_Spatial(d_water_utm)
-# # 
-# # d_bound <- read_sf("C:/Users/danka/Box/MIpostdoc/Detroit spatial data/Detroit boundary/Detroit_wv2_middle_boundary_v2.shp")
-# # d_bound_utm <- st_transform(d_bound, crs(d_peak))
-# 
-# 
-# 
-# p_per_day_stack[is.na(p_per_day_stack)] <- 0 #set na values to 0 (they weren't really NA)
-# p_per_day_stack <- mask(p_per_day_stack,  d_wv2_boundary_utm) #set all values outside of D to NA
-# # plot(p_per_day_stack[[10]])
-# # plot(mask(p_per_day_stack[[1]], d_bound_utm))
-# 
-# #library('viridis') #throws an error, but still works fine
-# # colr <- colorRampPalette(brewer.pal(10, 'RdYlGn'))
-# # myColorkey <- list( at= c(0, 100, 1000, 10000, 100000), ## where the colors change #max(p_per_day_stack)
-# #                    labels=c("0", "100", "1,000", "10,000", "100,000"), ## where to print labels
-# #                    title = "pollen grains/day")
-# # 
-# # levelplot(x = p_per_day_stack, layers = 36, margin=FALSE, main = "Julian day 125", #cuts = 10, #at = seq(0, 100, by = 20),
-# #           colorkey = myColorkey, col.regions = viridis(25), background = "black") + #par.settings=list(panel.background=list(col="black")) +
-# #   layer(sp.polygons(d_bound_utm, lwd = 1)) + layer(sp.polygons(d_water_utm, lwd = 2, fill = "skyblue")) 
-# #   
-# 
-# # 
-# # my.at=c(0,10, 50,100,500, 1000,5000, 10000,50000, 100000, 500000)
-# # my.brks=seq(0, 100, by=10)
-# # 
-# # myColorkey <- list(at=my.brks, labels=list(at=my.brks, labels=c(0,10, 50,100,500, "1,000","5,000", "10,000","50,000", "100,000", "500,000")), space="bottom")
-# # levelplot(p_per_day_stack, layers = 13, margin=FALSE, main = "Julian day 125", at= my.at, 
-# #           colorkey=myColorkey, col.regions = viridis(25, option = "A", direction = -1), 
-# #           background = "black", ylab = "", xlab = "",
-# #           scales=list(x=list(draw=FALSE), y=list(draw=FALSE)))
-# # 
-# # 
-# # #ANIMATE
-# # #saving a png file for each graph
-# # setwd("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/animation")
-# # p_per_day_stack
-# # #month and day as.Date((109 + 1), origin = "2016-12-31")
-# # for(i in 1:36){ #1:36
-# #   date_title <- paste("pollen release on:", as.Date((109 + i), origin = "2016-12-31")) #convert Julian to date
-# #   png(filename=paste("D_qf_",109 + i,".png", sep = ""), width = 600, height = 800, units = "px")
-# #   print(levelplot(x = p_per_day_stack, layers = i, margin=FALSE, main = date_title, cuts = 10, at = my.at,
-# #                   colorkey = myColorkey, 
-# #                   col.regions = viridis(25, option = "A", direction = -1),
-# #                   ylab = "", xlab = "", scales=list(x=list(draw=FALSE), y=list(draw=FALSE))) + #
-# #           layer(sp.polygons(d_bound_utm, lwd = 1))) +
-# #     layer(sp.polygons(d_water_utm, lwd = 2, fill = "skyblue"))
-# #   
-# #   dev.off()
-# # }
-# # 
-# # #creating an animation
-# # 
-# # list.files(path = ".", pattern = "*.png", full.names = T) %>%
-# #   purrr::map(image_read) %>% # reads each path file
-# #   image_join() %>% # joins image
-# #   image_animate(fps=1) %>% # animates, can opt for number of loops
-# #   image_write("oak_pollen_prod_in_Detroit_v1.gif") # write to current dir
-# 
-# 
-# # ## create a version where each pixel is the average of all pixels within 1km of it ------------------------------
-# # fwModel <- focalWeight(p_per_day_stack, 1000, type='circle')
-# # fwModel[fwModel>0] <- 1
-# # # km_mean_fun <- function(x){focal(x, w=fwModel, fun=mean, na.rm = TRUE)}
-# # # plot(km_mean_fun(p_per_day_stack[[2]]))
-# # 
-# # #I'm having a hard time applying this function to the whole raster brick, so I'm just doing it with a loop
-# # pol_prod_day_1km <- stack() # create an empty stack
-# # for (i in 1:nlayers(p_per_day_stack)){
-# #   mean_pollen_prod1km <- focal(p_per_day_stack[[i]], w=fwModel, fun=mean, na.rm = TRUE)
-# #   pol_prod_day_1km <- stack(pol_prod_day_1km , mean_pollen_prod1km )
-# # }#plot(x[[10]])
-# # 
-# # pol_prod_day_1km_m <- pol_prod_day_1km
-# # pol_prod_day_1km_m[is.na(pol_prod_day_1km_m)] <- 0 #set na values to 0 (they weren't really NA)
-# # pol_prod_day_1km_m <- mask(pol_prod_day_1km_m,  d_bound_utm) #set all values outside of D to NA
-# # 
-# # 
-# # #month and day as.Date((109 + 1), origin = "2016-12-31")
-# # setwd("C:/Users/danka/Box/MIpostdoc/trees/airborne_pollen/animation_prod__per_day_within1km")
-# # 
-# # my.at=c(0, 100, 500, 1000, 2500, 5000, 7500, 10000, 15000, 20000, 30000,40000, 60000)
-# # my.brks=seq(0, 100, by=10)
-# # myColorkey <- list(at=my.brks, 
-# #                    labels=list(at=my.brks,
-# #                                labels= my.at, #c(0,10, 50,100,500, "1,000","5,000", "10,000","50,000", "100,000", "500,000")
-# #                                #space="right", 
-# #                                #title = "pollen release within 1 km (grains/m2)"
-# #                    ))
-# # 
-# # 
-# # for(i in 1:36){ #1:36
-# #   date_title <- paste("pollen release on:", as.Date((109 + i), origin = "2016-12-31")) #convert Julian to date
-# #   png(filename=paste("D_qf_",109 + i,".png", sep = ""), width = 600, height = 800, units = "px")
-# #   print(levelplot(x = pol_prod_day_1km_m, layers = i, margin=FALSE, xlim=c(320420,333200), ylim=c(4680362,4700550),
-# #                   main = date_title, cuts = 500, at = my.at, 
-# #                   colorkey = myColorkey,  
-# #                   col.regions = viridis(500, option = "A", direction = -1),
-# #                   ylab = "", xlab = "", scales=list(x=list(draw=FALSE), y=list(draw=FALSE))) + #
-# #           layer(sp.polygons(d_bound_utm, lwd = 1)) 
-# #         #layer(sp.polygons(d_water_utm, lwd = 2, fill = "skyblue"))
-# #   )
-# #   dev.off()
-# # }
-# # 
-# # 
-# # list.files(path = ".", pattern = "*.png", full.names = T) %>%
-# #   purrr::map(image_read) %>% # reads each path file
-# #   image_join() %>% # joins image
-# #   image_animate(fps=1) %>% # animates, can opt for number of loops
-# #   image_write("oak_pollen_release_within_1km_v1.gif") # write to current dir
